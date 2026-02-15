@@ -17,10 +17,13 @@
 #define IO_ADDR_SCY  0x42
 #define IO_ADDR_SCX  0x43
 #define IO_ADDR_LCDY 0x44
+#define IO_ADDR_LYC 0x45
 #define IO_ADDR_STAT 0x41
 #define IO_ADDR_BGP  0x47
 #define IO_ADDR_OBP0 0x48
 #define IO_ADDR_OBP1 0x49
+#define IO_ADDR_WY 0x4A
+#define IO_ADDR_WX 0x4B
 
 #define LCDC_BG_ENABLE      0b00000001
 #define LCDC_OBJ_ENABLE     0b00000010
@@ -31,7 +34,12 @@
 #define LCDC_WINDOW_TILEMAP 0b01000000
 #define LCDC_ENABLE         0b10000000
 
+#define STAT_LYC 0b00000100
 #define STAT_MODE_MASK 0b00000011
+#define STAT_HBLANK_INT 0b00001000
+#define STAT_VBLANK_INT 0b00010000
+#define STAT_OAM_INT 0b00100000
+#define STAT_LYC_INT 0b01000000
 
 #define OBJ_PALETTE    0b00010000
 #define OBJ_FLIP_X     0b00100000
@@ -52,6 +60,7 @@ struct OAMEntry
     uint8_t x;
     uint8_t tile_index;
     uint8_t attributes;
+    uint8_t oam_index;
 };
 
 class PPU
@@ -67,16 +76,21 @@ private:
     void SetMode(PPUMode new_mode);
     void IncrementScanline();
 
+    void CheckLYC() const;
     void ScanOAM();
     void RenderScanline();
     void RenderBackground();
     void RenderSprites();
+    void RenderWindow();
+
+    void SortSprites();
 
     Memory* memory = nullptr;
 
     PPUMode mode = PPUMode::MODE_OAM;
     uint16_t dots = 0;
     uint8_t scanline = 0;
+    uint8_t window_line = 0;
 
     uint8_t scanline_buffer[SCREEN_WIDTH] = {};
     uint8_t priority_buffer[SCREEN_WIDTH] = {};

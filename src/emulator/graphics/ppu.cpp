@@ -1,8 +1,8 @@
 #include "ppu.h"
 #include <cstring>
+#include <algorithm>
 
 #include "../cpu/cpu.h"
-
 
 void PPU::Cycle()
 {
@@ -13,20 +13,22 @@ void PPU::Cycle()
         this->mode = PPUMode::MODE_HBLANK;
         this->scanline = 0;
         this->dots = 0;
+        this->window_line = 0;
         this->memory->WriteIO(IO_ADDR_LCDY, 0);
         return;
     }
 
     this->dots++;
 
+    uint8_t stat = this->memory->ReadIO(IO_ADDR_STAT);
     switch (this->mode)
     {
     case PPUMode::MODE_OAM:
         if (this->dots >= DOTS_OAM)
         {
             this->dots = 0;
-            SetMode(PPUMode::MODE_DRAW);
-            ScanOAM();
+            this->SetMode(PPUMode::MODE_DRAW);
+            this->ScanOAM();
         }
         break;
 
@@ -34,8 +36,13 @@ void PPU::Cycle()
         if (this->dots >= DOTS_DRAW)
         {
             this->dots = 0;
-            SetMode(PPUMode::MODE_HBLANK);
-            RenderScanline();
+            this->SetMode(PPUMode::MODE_HBLANK);
+            this->RenderScanline();
+
+            if (stat & STAT_HBLANK_INT)
+            {
+                this->memory->SetInterruptFlag(INTERRUPT_STAT);
+            }
         }
         break;
 
@@ -43,19 +50,30 @@ void PPU::Cycle()
         if (this->dots >= DOTS_HBLANK)
         {
             this->dots = 0;
-            IncrementScanline();
+            this->IncrementScanline();
+            this->CheckLYC();
 
             if (this->scanline > PPU_MAX_VISIBLE_SCANLINE)
             {
-                SetMode(PPUMode::MODE_VBLANK);
+                this->SetMode(PPUMode::MODE_VBLANK);
+
                 this->ready_for_draw = true;
 
-                const uint8_t interrupt_flag = this->memory->ReadIO(IO_ADDR_INTERRUPT_FLAG);
-                this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag | INTERRUPT_VBLANK);
+                if (stat & STAT_VBLANK_INT)
+                {
+                    this->memory->SetInterruptFlag(INTERRUPT_STAT);
+                }
+
+                this->memory->SetInterruptFlag(INTERRUPT_VBLANK);
             }
             else
             {
-                SetMode(PPUMode::MODE_OAM);
+                this->SetMode(PPUMode::MODE_OAM);
+
+                if (stat & STAT_OAM_INT)
+                {
+                    this->memory->SetInterruptFlag(INTERRUPT_STAT);
+                }
             }
         }
         break;
@@ -64,18 +82,22 @@ void PPU::Cycle()
         if (this->dots >= DOTS_TOTAL)
         {
             this->dots = 0;
-            IncrementScanline();
+            this->IncrementScanline();
+            this->CheckLYC();
 
             if (this->scanline > PPU_MAX_TOTAL_SCANLINE)
             {
                 this->scanline = 0;
+                this->window_line = 0;
                 this->memory->WriteIO(IO_ADDR_LCDY, 0);
-                SetMode(PPUMode::MODE_OAM);
+                this->CheckLYC();
+                this->SetMode(PPUMode::MODE_OAM);
             }
         }
         break;
     }
 }
+
 
 void PPU::AttachMemory(Memory* mem)
 {
@@ -98,6 +120,26 @@ void PPU::IncrementScanline()
     this->memory->WriteIO(IO_ADDR_LCDY, this->scanline);
 }
 
+void PPU::CheckLYC() const
+{
+    const uint8_t ly = this->memory->ReadIO(IO_ADDR_LCDY);
+    const uint8_t lyc = this->memory->ReadIO(IO_ADDR_LYC);
+    uint8_t stat = this->memory->ReadIO(IO_ADDR_STAT);
+
+    bool prev_lyc_flag = (stat & STAT_LYC) != 0;
+    bool ly_match = (ly == lyc);
+
+    if (ly_match)
+        stat |= STAT_LYC;
+    else
+        stat &= ~STAT_LYC;
+
+    if (ly_match && !prev_lyc_flag && (stat & STAT_LYC_INT))
+        this->memory->SetInterruptFlag(INTERRUPT_STAT);
+
+    this->memory->WriteIO(IO_ADDR_STAT, stat);
+}
+
 void PPU::ScanOAM()
 {
     this->sprites.clear();
@@ -108,7 +150,7 @@ void PPU::ScanOAM()
 
     const uint8_t sprite_height = (lcdc & LCDC_OBJ_SIZE) ? 16 : 8;
 
-    for (int oam_idx = 0; oam_idx < 40; oam_idx++)
+    for (uint8_t oam_idx = 0; oam_idx < 40; oam_idx++)
     {
         const uint16_t oam_addr = OAM_BEGIN + oam_idx * 4;
 
@@ -116,7 +158,8 @@ void PPU::ScanOAM()
             .y = this->memory->Read8(oam_addr),
             .x = this->memory->Read8(oam_addr + 1),
             .tile_index = this->memory->Read8(oam_addr + 2),
-            .attributes = this->memory->Read8(oam_addr + 3)
+            .attributes = this->memory->Read8(oam_addr + 3),
+            .oam_index = oam_idx
         };
 
         const int sprite_y = sprite.y - 16;
@@ -129,17 +172,20 @@ void PPU::ScanOAM()
                 break;
         }
     }
+
+    SortSprites();
 }
 
 void PPU::RenderScanline()
 {
-    memset(scanline_buffer, 0, SCREEN_WIDTH);
-    memset(priority_buffer, 0, SCREEN_WIDTH);
+    memset(this->scanline_buffer, 0, SCREEN_WIDTH);
+    memset(this->priority_buffer, 0, SCREEN_WIDTH);
 
-    RenderBackground();
-    RenderSprites();
+    this->RenderBackground();
+    this->RenderWindow();
+    this->RenderSprites();
 
-    memcpy(&framebuffer[scanline * SCREEN_WIDTH], scanline_buffer, SCREEN_WIDTH);
+    memcpy(&this->framebuffer[this->scanline * SCREEN_WIDTH], this->scanline_buffer, SCREEN_WIDTH);
 }
 
 void PPU::RenderBackground()
@@ -154,37 +200,43 @@ void PPU::RenderBackground()
     const uint8_t bgp = this->memory->ReadIO(IO_ADDR_BGP);
 
     const uint16_t tile_map_base = (lcdc & LCDC_BG_TILEMAP) ? 0x9C00 : 0x9800;
-    const uint16_t tile_data_base = (lcdc & LCDC_TILE_DATA) ? 0x8000 : 0x8800;
-    const bool is_signed = (lcdc & LCDC_TILE_DATA) == 0;
+    const bool use_unsigned_tile_data = (lcdc & LCDC_TILE_DATA) != 0;
 
     const uint8_t y = this->scanline + scy;
+    const uint8_t tile_y = y / 8;
+    const uint8_t pixel_y = y % 8;
+
+    uint8_t last_tile_x = 0xFF;
+    uint8_t tile_byte1 = 0;
+    uint8_t tile_byte2 = 0;
 
     for (int x = 0; x < SCREEN_WIDTH; x++)
     {
         const uint8_t px = x + scx;
-
         const uint8_t tile_x = px / 8;
-        const uint8_t tile_y = y / 8;
 
-        const uint16_t tile_map_addr = tile_map_base + (tile_y * 32) + tile_x;
-        const uint8_t tile_index = this->memory->Read8(tile_map_addr);
+        if (tile_x != last_tile_x)
+        {
+            const uint16_t tile_map_addr = tile_map_base + (tile_y * 32) + tile_x;
+            const uint8_t tile_index = this->memory->Read8(tile_map_addr);
 
-        const uint16_t tile_addr = is_signed
-            ? tile_data_base + (static_cast<int8_t>(tile_index) * 16)
-            : tile_data_base + (tile_index * 16);
+            const uint16_t tile_addr = use_unsigned_tile_data
+                ? 0x8000 + (tile_index * 16)
+                : 0x9000 + (static_cast<int8_t>(tile_index) * 16);
 
-        const uint8_t pixel_y = y % 8;
+            tile_byte1 = this->memory->Read8(tile_addr + (pixel_y * 2));
+            tile_byte2 = this->memory->Read8(tile_addr + (pixel_y * 2) + 1);
+
+            last_tile_x = tile_x;
+        }
+
         const uint8_t pixel_x = px % 8;
-
-        const uint8_t byte1 = this->memory->Read8(tile_addr + (pixel_y * 2));
-        const uint8_t byte2 = this->memory->Read8(tile_addr + (pixel_y * 2) + 1);
-
         const uint8_t bit = 7 - pixel_x;
-        const uint8_t palette_idx = ((byte2 >> bit) & 1) << 1 | ((byte1 >> bit) & 1);
+        const uint8_t palette_idx = ((tile_byte2 >> bit) & 1) << 1 | ((tile_byte1 >> bit) & 1);
         const uint8_t color = (bgp >> (palette_idx << 1)) & 0b11;
 
-        scanline_buffer[x] = color;
-        priority_buffer[x] = palette_idx;
+        this->scanline_buffer[x] = color;
+        this->priority_buffer[x] = palette_idx;
     }
 }
 
@@ -196,10 +248,8 @@ void PPU::RenderSprites()
 
     const uint8_t sprite_height = (lcdc & LCDC_OBJ_SIZE) ? 16 : 8;
 
-    for (int s = this->sprites.size() - 1; s >= 0; s--)
+    for (const auto sprite : this->sprites)
     {
-        const OAMEntry& sprite = this->sprites[s];
-
         const int sprite_x = sprite.x - 8;
         const int sprite_y = sprite.y - 16;
         const int sprite_line = this->scanline - sprite_y;
@@ -210,20 +260,16 @@ void PPU::RenderSprites()
         const uint8_t palette_addr = (sprite.attributes & OBJ_PALETTE) ? IO_ADDR_OBP1 : IO_ADDR_OBP0;
         const uint8_t palette = this->memory->ReadIO(palette_addr);
 
-        uint8_t tile_line = flip_y ? (sprite_height - 1 - sprite_line) : sprite_line;
+        const uint8_t flipped_line = flip_y ? (sprite_height - 1 - sprite_line) : sprite_line;
+
         uint8_t tile_index = sprite.tile_index;
+        uint8_t tile_line = flipped_line;
+
 
         if (sprite_height == 16)
         {
-            if (tile_line >= 8)
-            {
-                tile_index |= 0x01;
-                tile_line -= 8;
-            }
-            else
-            {
-                tile_index &= 0xFE;
-            }
+            tile_index = (tile_index & 0xFE) | (flipped_line >> 3);
+            tile_line = flipped_line & 0x07;
         }
 
         const uint16_t tile_addr = 0x8000 + (tile_index * 16);
@@ -243,11 +289,95 @@ void PPU::RenderSprites()
             if (palette_idx == 0)
                 continue;
 
-            if (priority && priority_buffer[screen_x] != 0)
+            if (priority && this->priority_buffer[screen_x] != 0)
                 continue;
 
             const uint8_t color = (palette >> (palette_idx << 1)) & 0b11;
-            scanline_buffer[screen_x] = color;
+            this->scanline_buffer[screen_x] = color;
         }
+    }
+}
+
+void PPU::RenderWindow()
+{
+    const uint8_t lcdc = this->memory->ReadIO(IO_ADDR_LCDC);
+    if (!(lcdc & LCDC_WINDOW_ENABLE) || !(lcdc & LCDC_BG_ENABLE))
+        return;
+
+    const uint8_t wy = this->memory->ReadIO(IO_ADDR_WY);
+    const uint8_t wx = this->memory->ReadIO(IO_ADDR_WX);
+
+    if (this->scanline < wy || wx > 166)
+        return;
+
+    const uint16_t tile_map_base = (lcdc & LCDC_WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
+    const bool use_unsigned_tile_data = (lcdc & LCDC_TILE_DATA) != 0;
+    const uint8_t bgp = this->memory->ReadIO(IO_ADDR_BGP);
+
+    const uint8_t tile_y = this->window_line / 8;
+    const uint8_t pixel_y = this->window_line % 8;
+
+    const int start_x = (wx >= 7) ? (wx - 7) : 0;
+
+    uint8_t last_tile_x = 0xFF;
+    uint8_t tile_byte1 = 0;
+    uint8_t tile_byte2 = 0;
+
+    for (int x = start_x; x < SCREEN_WIDTH; x++)
+    {
+        const int win_x = x - (wx - 7);
+        if (win_x < 0)
+            continue;
+
+        const uint8_t tile_x = win_x / 8;
+
+        if (tile_x != last_tile_x)
+        {
+            const uint16_t tile_map_addr = tile_map_base + (tile_y * 32) + tile_x;
+            const uint8_t tile_index = this->memory->Read8(tile_map_addr);
+
+            const uint16_t tile_addr = use_unsigned_tile_data
+                ? 0x8000 + (tile_index * 16)
+                : 0x9000 + (static_cast<int8_t>(tile_index) * 16);
+
+            tile_byte1 = this->memory->Read8(tile_addr + (pixel_y * 2));
+            tile_byte2 = this->memory->Read8(tile_addr + (pixel_y * 2) + 1);
+
+            last_tile_x = tile_x;
+        }
+
+        const uint8_t bit = 7 - (win_x % 8);
+        const uint8_t palette_idx = ((tile_byte2 >> bit) & 1) << 1 | ((tile_byte1 >> bit) & 1);
+        const uint8_t color = (bgp >> (palette_idx << 1)) & 0b11;
+
+        this->scanline_buffer[x] = color;
+        this->priority_buffer[x] = palette_idx;
+    }
+
+    this->window_line++;
+}
+
+void PPU::SortSprites()
+{
+    for (size_t i = 1; i < this->sprites.size(); i++)
+    {
+        const OAMEntry key = this->sprites[i];
+        int j = static_cast<int>(i) - 1;
+
+        while (j >= 0)
+        {
+            bool should_swap = false;
+            if (this->sprites[j].x != key.x)
+                should_swap = this->sprites[j].x < key.x;
+            else
+                should_swap = this->sprites[j].oam_index < key.oam_index;
+
+            if (!should_swap)
+                break;
+
+            this->sprites[j + 1] = this->sprites[j];
+            j--;
+        }
+        this->sprites[j + 1] = key;
     }
 }
