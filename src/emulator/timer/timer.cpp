@@ -47,8 +47,7 @@ void Timer::Cycle()
             {
                 this->memory->WriteIO(IO_ADDR_TIMA,this->memory->ReadIO(IO_ADDR_TMA));
 
-                const uint8_t interrupt_flag = this->memory->ReadIO(IO_ADDR_INTERRUPT_FLAG);
-                this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag | INTERRUPT_TIMER);
+                this->memory->SetInterruptFlag(INTERRUPT_TIMER);
             }
             else
             {

@@ -24,6 +24,9 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     this->input->AttachMemory(this->memory);
     this->timer->AttachMemory(this->memory);
 
+    printf("Title: %s\n", this->cartridge->GetTitle());
+    printf("Type: %s\n", this->cartridge->GetCartridgeType());
+
     this->is_running = true;
 }
 

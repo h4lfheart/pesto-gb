@@ -43,7 +43,8 @@ public:
     uint8_t cur_instr_cycles;
     uint64_t cycles;
 
-    bool ime;
+    bool halt = false;
+    bool ime = false;
 
     Memory* memory;
 private:

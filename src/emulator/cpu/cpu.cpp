@@ -28,8 +28,12 @@ void Cpu::Cycle()
 
     if (TryExecuteInterrupts())
     {
+        this->halt = false;
         return;
     }
+
+    if (this->halt)
+        return;
 
     InstructionRuntime* instruction = InstructionRuntime::From(this->memory, this->reg.PC);
     if (instruction == nullptr)
@@ -68,6 +72,11 @@ bool Cpu::TryExecuteInterrupts()
     {
         this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~INTERRUPT_JOYPAD);
         ExecuteInterrupt(INT_ADDR_JOYPAD);
+    }
+    else if (interrupts & INTERRUPT_STAT)
+    {
+        this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~INTERRUPT_STAT);
+        ExecuteInterrupt(INT_ADDR_LCD_STAT);
     }
 
     return true;

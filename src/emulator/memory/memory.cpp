@@ -1,6 +1,8 @@
 #include "memory.h"
 #include <cstdio>
 #include <process.h>
+
+#include "../cpu/cpu.h"
 #include "../io/input.h"
 #include "../timer/timer.h"
 
@@ -16,6 +18,7 @@ void Memory::InitializeMemoryMap()
     RegisterMemoryRegion(0xA000, 0xBFFF, &Memory::ReadCartridgeRam, &Memory::WriteCartridgeRam);
     RegisterMemoryRegion(0xC000, 0xCFFF, &Memory::ReadWRAM1, &Memory::WriteWRAM1);
     RegisterMemoryRegion(0xD000, 0xDFFF, &Memory::ReadWRAM2, &Memory::WriteWRAM2);
+    RegisterMemoryRegion(0xE000, 0xFDFF, &Memory::ReadWRAM1, &Memory::WriteWRAM1); // echo ram
     RegisterMemoryRegion(0xFE00, 0xFE9F, &Memory::ReadOAM, &Memory::WriteOAM);
     RegisterMemoryRegion(0xFEA0, 0xFEFF, &Memory::ReadInvalid, &Memory::WriteInvalid);
     RegisterMemoryRegion(0xFF00, 0xFF7F, &Memory::ReadIO, &Memory::WriteIO);
@@ -33,6 +36,12 @@ void Memory::RegisterMemoryRegion(uint16_t start, uint16_t end,
         .write_handler = write,
         .enabled = true
     });
+}
+
+void Memory::SetInterruptFlag(uint8_t flag)
+{
+    const uint8_t interrupt_flag = this->ReadIO(IO_ADDR_INTERRUPT_FLAG);
+    this->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag | flag);
 }
 
 MemoryMapEntry* Memory::MemoryRegion(uint16_t address)
@@ -103,6 +112,7 @@ void Memory::AttachCartridge(Cartridge* cart)
     this->WriteIO(IO_ADDR_JOYP, 0b00001111);
 }
 
+
 uint8_t Memory::ReadCartridgeRom(uint16_t offset)
 {
     if (this->use_boot_rom && offset < 0x100)
@@ -110,21 +120,22 @@ uint8_t Memory::ReadCartridgeRom(uint16_t offset)
         return this->boot_rom[offset];
     }
 
-    return this->cartridge->rom_data[offset];
+    return this->cartridge->ReadRom(offset);
 }
 
 void Memory::WriteCartridgeRom(uint16_t offset, uint8_t value)
 {
+    this->cartridge->WriteRom(offset, value);
 }
 
 uint8_t Memory::ReadCartridgeRam(uint16_t offset)
 {
-    return this->cartridge->ram[offset];
+    return this->cartridge->ReadRam(offset);
 }
 
 void Memory::WriteCartridgeRam(uint16_t offset, uint8_t value)
 {
-    this->cartridge->ram[offset] = value;
+    this->cartridge->WriteRam(offset, value);
 }
 
 uint8_t Memory::ReadWRAM1(uint16_t offset)

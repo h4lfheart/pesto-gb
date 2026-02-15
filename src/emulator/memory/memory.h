@@ -45,6 +45,8 @@ public:
     void RegisterMemoryRegion(uint16_t start, uint16_t end,
                               ReadFunc read, WriteFunc write_fn);
 
+    void SetInterruptFlag(uint8_t flag);
+
     uint8_t Read8(uint16_t address);
     void Write8(uint16_t address, uint8_t value);
 
