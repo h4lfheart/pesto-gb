@@ -11,6 +11,10 @@
 #define GB_OAM_SIZE 0xA0
 #define GB_IO_SIZE 0x80
 
+#define IO_ADDR_DMA 0x46
+
+#define ADDR_OAM_START 0xFE00
+
 class Memory
 {
 public:
@@ -27,6 +31,7 @@ public:
     void Write16(uint16_t address, uint16_t value);
 
     void AttachCartridge(Cartridge* cart);
+    void DMATransfer(uint8_t source_high_byte);
 
     uint8_t ie;
 
@@ -41,7 +46,6 @@ private:
     uint8_t boot_rom[GB_BOOT_ROM_SIZE] = {};
 
 public:
-
     uint8_t oam[GB_OAM_SIZE] = {};
     uint8_t wram1[GB_WRAM_SIZE] = {};
     uint8_t wram2[GB_WRAM_SIZE] = {};

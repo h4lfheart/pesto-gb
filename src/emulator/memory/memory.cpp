@@ -55,6 +55,18 @@ void Memory::AttachCartridge(Cartridge* cart)
     this->Write(0xFF00, 0xFF);
 }
 
+void Memory::DMATransfer(uint8_t source_high_byte)
+{
+    const uint16_t source = source_high_byte << 8;
+
+    // Copy 160 bytes from source to OAM
+    for (uint16_t i = 0; i < 0xA0; i++)
+    {
+        uint8_t value = Read8(source + i);
+        this->oam[i] = value;
+    }
+}
+
 uint8_t Memory::Read(uint16_t address)
 {
     // TODO use memory map entries
@@ -123,6 +135,13 @@ void Memory::Write(uint16_t address, uint8_t value)
         this->use_boot_rom = false;
     }
 
+    // DMA Transfer (0xFF46)
+    if (address == 0xFF00 + IO_ADDR_DMA)
+    {
+        DMATransfer(value);
+        return;
+    }
+
     if (address <= 0x7FFF)
     {
         return;
@@ -152,7 +171,7 @@ void Memory::Write(uint16_t address, uint8_t value)
         return;
     }
 
-    if (address >= 0xFE00 && address <= 0xFE9F)
+    if (address >= ADDR_OAM_START && address <= 0xFE9F)
     {
         this->oam[address - 0xFE00] = value;
         return;

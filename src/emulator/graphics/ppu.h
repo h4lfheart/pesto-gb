@@ -1,56 +1,84 @@
 #pragma once
 #include "../memory/memory.h"
+#include <vector>
 
 #define SCREEN_WIDTH  160
 #define SCREEN_HEIGHT 144
 
-#define PPU_MAX_VISIBLE_SCANLINE 143 // 0..143 = 144 total
-#define PPU_MAX_TOTAL_SCANLINE 153 // 0..153 = 153
+#define PPU_MAX_VISIBLE_SCANLINE 143
+#define PPU_MAX_TOTAL_SCANLINE 153
 
+#define DOTS_TOTAL 456
 #define DOTS_OAM 80
-#define DOTS_DRAW 289
-#define DOTS_HBLANK 87
-#define DOTS_VBLANK (DOTS_OAM + DOTS_DRAW + DOTS_HBLANK)
+#define DOTS_DRAW 172
+#define DOTS_HBLANK 204
 
 #define IO_ADDR_LCDC 0x40
 #define IO_ADDR_SCY  0x42
 #define IO_ADDR_SCX  0x43
 #define IO_ADDR_LCDY 0x44
-#define IO_ADDR_STAT 0x45
+#define IO_ADDR_STAT 0x41
 #define IO_ADDR_BGP  0x47
+#define IO_ADDR_OBP0 0x48
+#define IO_ADDR_OBP1 0x49
 
-#define LCDC_BG_ENABLE 0b00000001
-#define LCDC_BG_TILEMAP 0b00001000
-#define LCDC_TILE_DATA 0b00010000
-#define LCDC_ENABLE 0b10000000
+#define LCDC_BG_ENABLE      0b00000001
+#define LCDC_OBJ_ENABLE     0b00000010
+#define LCDC_OBJ_SIZE       0b00000100
+#define LCDC_BG_TILEMAP     0b00001000
+#define LCDC_TILE_DATA      0b00010000
+#define LCDC_WINDOW_ENABLE  0b00100000
+#define LCDC_WINDOW_TILEMAP 0b01000000
+#define LCDC_ENABLE         0b10000000
 
 #define STAT_MODE_MASK 0b00000011
 
+#define OBJ_PALETTE    0b00010000
+#define OBJ_FLIP_X     0b00100000
+#define OBJ_FLIP_Y     0b01000000
+#define OBJ_PRIORITY   0b10000000
+
 enum class PPUMode
 {
-    MODE_NONE = -1,
     MODE_OAM = 2,
     MODE_DRAW = 3,
     MODE_HBLANK = 0,
     MODE_VBLANK = 1
 };
 
-class PPU {
+struct OAMEntry
+{
+    uint8_t y;
+    uint8_t x;
+    uint8_t tile_index;
+    uint8_t attributes;
+};
+
+class PPU
+{
 public:
     void Cycle();
     void AttachMemory(Memory* mem);
 
     uint8_t framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] = {};
-
     bool ready_for_draw = false;
 
 private:
-    void DrawScanline();
+    void SetMode(PPUMode new_mode);
+    void IncrementScanline();
+
+    void ScanOAM();
+    void RenderScanline();
+    void RenderBackground();
+    void RenderSprites();
 
     Memory* memory = nullptr;
 
-    PPUMode mode = PPUMode::MODE_NONE;
-
+    PPUMode mode = PPUMode::MODE_OAM;
     uint16_t dots = 0;
     uint8_t scanline = 0;
+
+    uint8_t scanline_buffer[SCREEN_WIDTH] = {};
+    uint8_t priority_buffer[SCREEN_WIDTH] = {};
+    std::vector<OAMEntry> sprites;
 };
