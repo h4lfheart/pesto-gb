@@ -6,6 +6,7 @@
 #include "memory/cartridge.h"
 #include "graphics/ppu.h"
 #include "io/input.h"
+#include "timer/timer.h"
 
 typedef std::function<void(uint8_t data[SCREEN_WIDTH * SCREEN_HEIGHT])> DrawFunction;
 
@@ -31,6 +32,7 @@ private:
     Cartridge* cartridge;
     PPU* ppu;
     Input* input;
+    Timer* timer;
 
     bool is_running = false;
 };

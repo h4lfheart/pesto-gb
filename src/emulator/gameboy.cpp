@@ -9,6 +9,7 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     this->cartridge = new Cartridge();
     this->ppu = new PPU();
     this->input = new Input();
+    this->timer = new Timer();
 
     if (rom_path != nullptr)
         this->cartridge->LoadRom(rom_path);
@@ -21,6 +22,7 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     this->cpu->AttachMemory(this->memory);
     this->ppu->AttachMemory(this->memory);
     this->input->AttachMemory(this->memory);
+    this->timer->AttachMemory(this->memory);
 
     this->is_running = true;
 }
@@ -54,6 +56,7 @@ void GameBoy::Run()
             this->cpu->Cycle();
             this->ppu->Cycle();
             this->input->Cycle();
+            this->timer->Cycle();
 
             if (this->ppu->ready_for_draw)
             {

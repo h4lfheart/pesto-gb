@@ -8,6 +8,12 @@ void nop(Cpu* cpu, InstructionRuntime* instr)
 
 }
 
+void halt(Cpu* cpu, InstructionRuntime* instr)
+{
+
+}
+
+
 void di(Cpu* cpu, InstructionRuntime* instr)
 {
    cpu->ime = false;
@@ -963,7 +969,7 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
    new InstructionDef("LD (HL), E", 0x73, ld_m16_r8, 1, 2, 2, RegisterType::REG_HL, RegisterType::REG_E),
    new InstructionDef("LD (HL), H", 0x74, ld_m16_r8, 1, 2, 2, RegisterType::REG_HL, RegisterType::REG_H),
    new InstructionDef("LD (HL), L", 0x75, ld_m16_r8, 1, 2, 2, RegisterType::REG_HL, RegisterType::REG_L),
-   new InstructionDef("HALT", 0x76, nullptr, 1, 1, 1),
+   new InstructionDef("HALT", 0x76, halt, 1, 1, 1),
    new InstructionDef("LD (HL), A", 0x77, ld_m16_r8, 1, 2, 2, RegisterType::REG_HL, RegisterType::REG_A),
 
    new InstructionDef("LD A, B", 0x78, ld_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_B),

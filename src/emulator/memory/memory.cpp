@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <process.h>
 #include "../io/input.h"
+#include "../timer/timer.h"
 
 Memory::Memory()
 {
