@@ -110,13 +110,14 @@ void PPU::ScanOAM()
 
     for (int oam_idx = 0; oam_idx < 40; oam_idx++)
     {
-        const uint16_t oam_addr = ADDR_OAM_START + oam_idx * 4;
+        const uint16_t oam_addr = OAM_BEGIN + oam_idx * 4;
 
-        OAMEntry sprite;
-        sprite.y = this->memory->Read8(oam_addr);
-        sprite.x = this->memory->Read8(oam_addr + 1);
-        sprite.tile_index = this->memory->Read8(oam_addr + 2);
-        sprite.attributes = this->memory->Read8(oam_addr + 3);
+        OAMEntry sprite = {
+            .y = this->memory->Read8(oam_addr),
+            .x = this->memory->Read8(oam_addr + 1),
+            .tile_index = this->memory->Read8(oam_addr + 2),
+            .attributes = this->memory->Read8(oam_addr + 3)
+        };
 
         const int sprite_y = sprite.y - 16;
         const int sprite_line = this->scanline - sprite_y;
