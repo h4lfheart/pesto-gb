@@ -28,6 +28,68 @@ int main(int argc, char** argv)
                 game_boy.Stop();
                 break;
             }
+
+            if (event.type == SDL_KEYDOWN)
+            {
+                switch(event.key.keysym.sym)
+                {
+                case SDLK_UP:
+                    game_boy.PressButton(InputButton::BUTTON_UP);
+                    break;
+                case SDLK_DOWN:
+                    game_boy.PressButton(InputButton::BUTTON_DOWN);
+                    break;
+                case SDLK_LEFT:
+                    game_boy.PressButton(InputButton::BUTTON_LEFT);
+                    break;
+                case SDLK_RIGHT:
+                    game_boy.PressButton(InputButton::BUTTON_RIGHT);
+                    break;
+                case SDLK_x:
+                    game_boy.PressButton(InputButton::BUTTON_A);
+                    break;
+                case SDLK_z:
+                    game_boy.PressButton(InputButton::BUTTON_B);
+                    break;
+                case SDLK_RETURN:
+                    game_boy.PressButton(InputButton::BUTTON_START);
+                    break;
+                case SDLK_RSHIFT:
+                    game_boy.PressButton(InputButton::BUTTON_SELECT);
+                    break;
+                }
+            }
+
+            if (event.type == SDL_KEYUP)
+            {
+                switch(event.key.keysym.sym)
+                {
+                case SDLK_UP:
+                    game_boy.ReleaseButton(InputButton::BUTTON_UP);
+                    break;
+                case SDLK_DOWN:
+                    game_boy.ReleaseButton(InputButton::BUTTON_DOWN);
+                    break;
+                case SDLK_LEFT:
+                    game_boy.ReleaseButton(InputButton::BUTTON_LEFT);
+                    break;
+                case SDLK_RIGHT:
+                    game_boy.ReleaseButton(InputButton::BUTTON_RIGHT);
+                    break;
+                case SDLK_x:
+                    game_boy.ReleaseButton(InputButton::BUTTON_A);
+                    break;
+                case SDLK_z:
+                    game_boy.ReleaseButton(InputButton::BUTTON_B);
+                    break;
+                case SDLK_RETURN:
+                    game_boy.ReleaseButton(InputButton::BUTTON_START);
+                    break;
+                case SDLK_RSHIFT:
+                    game_boy.ReleaseButton(InputButton::BUTTON_SELECT);
+                    break;
+                }
+            }
         }
 
         SDL_Delay(1);

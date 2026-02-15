@@ -8,6 +8,7 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     this->memory = new Memory();
     this->cartridge = new Cartridge();
     this->ppu = new PPU();
+    this->input = new Input();
 
     if (rom_path != nullptr)
         this->cartridge->LoadRom(rom_path);
@@ -15,19 +16,13 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     if (boot_rom_path != nullptr)
         this->memory->LoadBootRom(boot_rom_path);
 
-    this->cpu->AttachMemory(this->memory);
     this->memory->AttachCartridge(this->cartridge);
+
+    this->cpu->AttachMemory(this->memory);
     this->ppu->AttachMemory(this->memory);
+    this->input->AttachMemory(this->memory);
 
     this->is_running = true;
-}
-
-GameBoy::~GameBoy()
-{
-    delete cpu;
-    delete memory;
-    delete cartridge;
-    delete ppu;
 }
 
 uint64_t get_time()
@@ -42,11 +37,13 @@ void GameBoy::Run()
     uint64_t last_time = get_time();
     uint64_t current_time = 0;
 
+    uint64_t frame_interval = FRAME_INTERVAL;
+    //frame_interval = 0;
     while (this->is_running)
     {
         current_time = get_time();
 
-        if (current_time - last_time < FRAME_INTERVAL)
+        if (current_time - last_time < frame_interval)
             continue;
 
         last_time = current_time;
@@ -56,6 +53,7 @@ void GameBoy::Run()
         {
             this->cpu->Cycle();
             this->ppu->Cycle();
+            this->input->Cycle();
 
             if (this->ppu->ready_for_draw)
             {
@@ -63,7 +61,6 @@ void GameBoy::Run()
                 this->ppu->ready_for_draw = false;
             }
         }
-
     }
 }
 
@@ -75,6 +72,16 @@ void GameBoy::Stop()
 bool GameBoy::IsRunning()
 {
     return this->is_running;
+}
+
+void GameBoy::PressButton(InputButton button)
+{
+    this->input->PressButton(button);
+}
+
+void GameBoy::ReleaseButton(InputButton button)
+{
+    this->input->ReleaseButton(button);
 }
 
 void GameBoy::OnDraw(const DrawFunction onDraw)

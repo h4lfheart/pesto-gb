@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <process.h>
 
+#include "../io/input.h"
+
 Memory::Memory()
 {
 }
@@ -55,12 +57,6 @@ void Memory::AttachCartridge(Cartridge* cart)
 
 uint8_t Memory::Read(uint16_t address)
 {
-    // joyp hardcode to load
-    if (address == 0xFF00)
-    {
-        return 0xFF;
-    }
-
     // TODO use memory map entries
     if (this->use_boot_rom && address < 0x100)
     {

@@ -40,7 +40,6 @@ void Cpu::Cycle()
         return;
     }
 
-
     this->reg.PC += instruction->def->size;
 
     instruction->Execute(this);
@@ -65,6 +64,11 @@ bool Cpu::TryExecuteInterrupts()
         this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~INTERRUPT_VBLANK);
         ExecuteInterrupt(INT_ADDR_VBLANK);
     }
+    else if (interrupts & INTERRUPT_JOYPAD)
+    {
+        this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~INTERRUPT_JOYPAD);
+        ExecuteInterrupt(INT_ADDR_JOYPAD);
+    }
 
     return true;
 }
@@ -85,8 +89,6 @@ uint16_t Cpu::Pop16()
 
 void Cpu::ExecuteInterrupt(uint16_t addr)
 {
-
     Push16(this->reg.PC);
-
     this->reg.PC = addr;
 }
