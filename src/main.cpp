@@ -9,7 +9,10 @@ int main(int argc, char** argv)
     GameBoy game_boy(argv[1], argv[2]);
 
     auto display = Display();
-    display.Initialize();
+    if (!display.Initialize()) {
+        fprintf(stderr, "Failed to initialize display");
+        return 1;
+    }
 
     game_boy.OnDraw([&](uint8_t* data)
     {
@@ -91,8 +94,6 @@ int main(int argc, char** argv)
                 }
             }
         }
-
-        SDL_Delay(1);
     }
 
     game_thread.join();

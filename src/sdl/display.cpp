@@ -41,7 +41,6 @@ bool Display::Initialize() {
         HEIGHT
     );
 
-
     if (!texture) {
         return false;
     }
@@ -53,14 +52,29 @@ bool Display::Initialize() {
 
 void Display::Update(uint8_t* pixels) {
     uint32_t framebuffer[WIDTH * HEIGHT] = {};
-    for (int i = 0; i < WIDTH * HEIGHT; i++)
-    {
+
+    for (int i = 0; i < WIDTH * HEIGHT; i++) {
         framebuffer[i] = palette[pixels[i]];
     }
 
     SDL_UpdateTexture(texture, nullptr, framebuffer, WIDTH * sizeof(uint32_t));
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+
+    // pixel grid effect
+    SDL_SetRenderDrawColor(renderer, 0x10, 0x10, 0x10, 0x18);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    for (int x = 1; x < WIDTH; x++) {
+        SDL_Rect line = { x * SCALE - 1, 0, 1, HEIGHT * SCALE };
+        SDL_RenderFillRect(renderer, &line);
+    }
+
+    for (int y = 1; y < HEIGHT; y++) {
+        SDL_Rect line = { 0, y * SCALE - 1, WIDTH * SCALE, 1 };
+        SDL_RenderFillRect(renderer, &line);
+    }
+
     SDL_RenderPresent(renderer);
 }
 

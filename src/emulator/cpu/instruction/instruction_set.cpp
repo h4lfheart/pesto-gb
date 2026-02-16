@@ -186,6 +186,16 @@ void call_nz_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
+void call_nc_a16(Cpu* cpu, InstructionRuntime* instr)
+{
+   if (!cpu->reg.GetFlag(FlagType::FLAG_C))
+   {
+      cpu->Push16(cpu->reg.PC);
+      cpu->reg.PC = instr->imm.u16;
+      instr->cycles = instr->def->alt_cycles;
+   }
+}
+
 void ret(Cpu* cpu, InstructionRuntime* instr)
 {
    cpu->reg.PC = cpu->Pop16();
@@ -1247,12 +1257,15 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
    new InstructionDef("JP Z, a16", 0xCA, jp_z_a16, 3, 4, 3),
    new InstructionDef("CALL Z, a16", 0xCC, call_z_a16, 3, 6, 3),
    new InstructionDef("CALL a16", 0xCD, call_a16, 3, 6, 6),
+   new InstructionDef("RST 1", 0xCF, rst, 1, 4, 4, RegisterType::REG_NONE, RegisterType::REG_NONE, 0x08),
 
    new InstructionDef("RET NC", 0xD0, ret_nc, 1, 5, 2),
    new InstructionDef("POP DE", 0xD1, pop_r16, 1, 3, 3, RegisterType::REG_DE),
    new InstructionDef("JP NC, a16", 0xD2, jp_nc_a16, 3, 4, 3),
+   new InstructionDef("CALL NV, a16", 0xD4, call_nc_a16, 3, 6, 3),
    new InstructionDef("PUSH DE", 0xD5, push_r16, 1, 4, 4, RegisterType::REG_DE),
    new InstructionDef("SUB A, d8", 0xD6, sub_r8_d8, 2, 2, 2, RegisterType::REG_A),
+   new InstructionDef("RST 2", 0xD7, rst, 1, 4, 4, RegisterType::REG_NONE, RegisterType::REG_NONE, 0x10),
    new InstructionDef("RET C", 0xD8, ret_c, 1, 5, 2),
    new InstructionDef("RETI", 0xD9, reti, 1, 4, 4),
    new InstructionDef("JP C, a16", 0xDA, jp_c_a16, 3, 4, 3),

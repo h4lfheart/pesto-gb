@@ -46,6 +46,11 @@
 #define OBJ_FLIP_Y     0b01000000
 #define OBJ_PRIORITY   0b10000000
 
+#define WX_OFFSET 7
+
+#define OAM_STRUCT_SIZE 4
+#define OAM_MAX_COUNT 40
+
 enum class PPUMode
 {
     MODE_OAM = 2,
@@ -54,13 +59,19 @@ enum class PPUMode
     MODE_VBLANK = 1
 };
 
-struct OAMEntry
+struct OAMObject
 {
     uint8_t y;
     uint8_t x;
     uint8_t tile_index;
     uint8_t attributes;
     uint8_t oam_index;
+};
+
+struct PPUPixel
+{
+    uint8_t color_idx;
+    uint8_t priority_idx;
 };
 
 class PPU
@@ -77,13 +88,12 @@ private:
     void IncrementScanline();
 
     void CheckLYC() const;
-    void ScanOAM();
     void RenderScanline();
     void RenderBackground();
-    void RenderSprites();
     void RenderWindow();
 
-    void SortSprites();
+    void ScanOAM();
+    void RenderObjects();
 
     Memory* memory = nullptr;
 
@@ -92,7 +102,6 @@ private:
     uint8_t scanline = 0;
     uint8_t window_line = 0;
 
-    uint8_t scanline_buffer[SCREEN_WIDTH] = {};
-    uint8_t priority_buffer[SCREEN_WIDTH] = {};
-    std::vector<OAMEntry> sprites;
+    PPUPixel scanline_pixels[SCREEN_WIDTH] = {};
+    std::vector<OAMObject> objects;
 };

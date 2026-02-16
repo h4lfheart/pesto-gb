@@ -13,6 +13,9 @@ file(GLOB_RECURSE SOURCES
         src/*.h
 )
 
-add_executable(pesto_gb ${SOURCES})
-target_link_libraries(pesto_gb PRIVATE SDL2::SDL2main SDL2::SDL2-static)
+if(WIN32)
+    set(ICON_RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/app.rc")
+endif()
 
+add_executable(pesto_gb ${SOURCES} ${ICON_RESOURCE})
+target_link_libraries(pesto_gb PRIVATE SDL2::SDL2main SDL2::SDL2-static)
