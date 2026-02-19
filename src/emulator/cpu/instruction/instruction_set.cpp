@@ -186,6 +186,16 @@ void call_nz_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
+void call_c_a16(Cpu* cpu, InstructionRuntime* instr)
+{
+   if (cpu->reg.GetFlag(FlagType::FLAG_C))
+   {
+      cpu->Push16(cpu->reg.PC);
+      cpu->reg.PC = instr->imm.u16;
+      instr->cycles = instr->def->alt_cycles;
+   }
+}
+
 void call_nc_a16(Cpu* cpu, InstructionRuntime* instr)
 {
    if (!cpu->reg.GetFlag(FlagType::FLAG_C))
@@ -370,6 +380,14 @@ void ld_r8_imm16(Cpu* cpu, InstructionRuntime* instr)
    *reg = cpu->memory->Read8(instr->imm.u16);
 }
 
+void ld_r8_m8(Cpu* cpu, InstructionRuntime* instr)
+{
+   uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
+   uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
+
+   *reg1 = cpu->memory->Read8(0xFF00 | *reg2);
+}
+
 void ld_r8_m16(Cpu* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
@@ -507,6 +525,24 @@ void adc_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    const uint16_t result16 = *reg1 + *reg2 + cur_carry;
    const uint8_t result8 = result16 & 0xFF;
    const uint8_t half_carry = ((*reg1 & 0xF) + (*reg2 & 0xF) + cur_carry) > 0xF;
+   const uint8_t carry = result16 > U8_MASK;
+
+   *reg1 = result8;
+
+   cpu->reg.SetFlag(FlagType::FLAG_Z, result8 == 0);
+   cpu->reg.SetFlag(FlagType::FLAG_N, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_H, half_carry);
+   cpu->reg.SetFlag(FlagType::FLAG_C, carry);
+}
+void adc_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+{
+   uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
+
+   uint8_t cur_carry = cpu->reg.GetFlag(FlagType::FLAG_C);
+
+   const uint16_t result16 = *reg1 + instr->imm.u8 + cur_carry;
+   const uint8_t result8 = result16 & 0xFF;
+   const uint8_t half_carry = ((*reg1 & 0xF) + (instr->imm.u8 & 0xF) + cur_carry) > 0xF;
    const uint8_t carry = result16 > U8_MASK;
 
    *reg1 = result8;
@@ -852,6 +888,19 @@ void rla(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
+void rra(Cpu* cpu, InstructionRuntime* instr)
+{
+   uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
+
+   const uint8_t carry_bit = *reg & 1;
+   *reg = (*reg >> 1) | cpu->reg.GetFlag(FlagType::FLAG_C) << 7;
+
+   cpu->reg.SetFlag(FlagType::FLAG_Z, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_N, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_H, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
+}
+
 void rlca(Cpu* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
@@ -1090,6 +1139,7 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
    new InstructionDef("INC E", 0x1C, inc_r8, 1, 1, 1, RegisterType::REG_E),
    new InstructionDef("DEC E", 0x1D, dec_r8, 1, 1, 1, RegisterType::REG_E),
    new InstructionDef("LD E, d8", 0x1E, ld_r8_d8, 2, 2, 2, RegisterType::REG_E),
+   new InstructionDef("RRA", 0x1F, rra, 1, 1, 1),
 
    new InstructionDef("JR NZ, s8", 0x20, jr_nz_s8, 2, 3, 2),
    new InstructionDef("LD HL, d16", 0x21, ld_r16_d16, 3, 3, 3, RegisterType::REG_HL),
@@ -1199,18 +1249,23 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
    new InstructionDef("ADD A, C", 0x81, add_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_C),
    new InstructionDef("ADD A, D", 0x82, add_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_D),
    new InstructionDef("ADD A, E", 0x83, add_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_E),
+   new InstructionDef("ADD A, H", 0x84, add_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_H),
    new InstructionDef("ADD A, L", 0x85, add_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_L),
    new InstructionDef("ADD A, (HL)", 0x86, add_r8_m16, 1, 2, 2, RegisterType::REG_A, RegisterType::REG_HL),
    new InstructionDef("ADD A, A", 0x87, add_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_A),
 
    new InstructionDef("ADC A, B", 0x88, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_B),
    new InstructionDef("ADC A, C", 0x89, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_C),
+   new InstructionDef("ADC A, D", 0x8A, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_D),
+   new InstructionDef("ADC A, H", 0x8C, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_H),
    new InstructionDef("ADC A, (HL)", 0x8E, adc_r8_m16, 1, 2, 2, RegisterType::REG_A, RegisterType::REG_HL),
 
    new InstructionDef("SUB A, B", 0x90, sub_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_B),
    new InstructionDef("SUB A, C", 0x91, sub_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_C),
    new InstructionDef("SUB A, D", 0x92, sub_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_D),
    new InstructionDef("SUB A, E", 0x93, sub_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_E),
+   new InstructionDef("SUB A, H", 0x94, sub_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_H),
+   new InstructionDef("SUB A, L", 0x95, sub_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_L),
    new InstructionDef("SUB A, (HL)", 0x96, sub_r8_m16, 1, 2, 2, RegisterType::REG_A, RegisterType::REG_HL),
 
    new InstructionDef("SBC A, B", 0x98, sbc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_B),
@@ -1257,6 +1312,7 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
    new InstructionDef("JP Z, a16", 0xCA, jp_z_a16, 3, 4, 3),
    new InstructionDef("CALL Z, a16", 0xCC, call_z_a16, 3, 6, 3),
    new InstructionDef("CALL a16", 0xCD, call_a16, 3, 6, 6),
+   new InstructionDef("ADC A, d8", 0xCE, adc_r8_d8, 2, 2, 2, RegisterType::REG_A),
    new InstructionDef("RST 1", 0xCF, rst, 1, 4, 4, RegisterType::REG_NONE, RegisterType::REG_NONE, 0x08),
 
    new InstructionDef("RET NC", 0xD0, ret_nc, 1, 5, 2),
@@ -1269,7 +1325,9 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
    new InstructionDef("RET C", 0xD8, ret_c, 1, 5, 2),
    new InstructionDef("RETI", 0xD9, reti, 1, 4, 4),
    new InstructionDef("JP C, a16", 0xDA, jp_c_a16, 3, 4, 3),
+   new InstructionDef("CALL C, a16", 0xDC, call_c_a16, 3, 6, 3),
    new InstructionDef("SBC A, d8", 0xDE, sbc_r8_d8, 2, 2, 2, RegisterType::REG_A),
+   new InstructionDef("RST 3", 0xDF, rst, 1, 4, 4, RegisterType::REG_NONE, RegisterType::REG_NONE, 0x18),
 
    new InstructionDef("LD (a8), A", 0xE0, ld_imm8_r8, 2, 3, 3, RegisterType::REG_A),
    new InstructionDef("POP HL", 0xE1, pop_r16, 1, 3, 3, RegisterType::REG_HL),
@@ -1284,9 +1342,11 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
 
    new InstructionDef("LD A, (a8)", 0xF0, ld_r8_imm8, 2, 3, 3, RegisterType::REG_A),
    new InstructionDef("POP AF", 0xF1, pop_r16, 1, 3, 3, RegisterType::REG_AF),
+   new InstructionDef("LD A, (C)", 0xF2, ld_r8_m8, 1, 2, 2, RegisterType::REG_A, RegisterType::REG_C),
    new InstructionDef("DI", 0xF3, di, 1, 1, 1),
    new InstructionDef("PUSH AF", 0xF5, push_r16, 1, 4, 4, RegisterType::REG_AF),
    new InstructionDef("OR A, d8", 0xF6, or_r8_d8, 2, 2, 2, RegisterType::REG_A),
+   new InstructionDef("RST 6", 0xF7, rst, 1, 4, 4, RegisterType::REG_NONE, RegisterType::REG_NONE, 0x30),
    new InstructionDef("LD HL, SP+s8", 0xF8, ld_r16_r16_s8, 2, 3, 3, RegisterType::REG_HL, RegisterType::REG_SP),
    new InstructionDef("LD SP, HL", 0xF9, ld_r16_r16, 1, 2, 2, RegisterType::REG_SP, RegisterType::REG_HL),
    new InstructionDef("LD A, (a16)", 0xFA, ld_r8_imm16, 3, 4, 4, RegisterType::REG_A),

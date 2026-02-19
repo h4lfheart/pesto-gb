@@ -10,6 +10,7 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     this->ppu = new PPU();
     this->input = new Input();
     this->timer = new Timer();
+    this->apu = new APU();
 
     if (rom_path != nullptr)
         this->cartridge->LoadRom(rom_path);
@@ -23,6 +24,7 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     this->ppu->AttachMemory(this->memory);
     this->input->AttachMemory(this->memory);
     this->timer->AttachMemory(this->memory);
+    this->apu->AttachMemory(this->memory);
 
     printf("Title: %s\n", this->cartridge->GetTitle());
     printf("Type: %s\n", this->cartridge->GetCartridgeType());
@@ -58,6 +60,7 @@ void GameBoy::Run()
         {
             this->cpu->Cycle();
             this->ppu->Cycle();
+            this->apu->Cycle();
             this->input->Cycle();
             this->timer->Cycle();
 
@@ -65,6 +68,14 @@ void GameBoy::Run()
             {
                 this->OnDrawFunction(this->ppu->framebuffer);
                 this->ppu->ready_for_draw = false;
+            }
+
+            if (this->apu->ready_for_samples)
+            {
+                float left, right;
+                this->apu->GetSamples(left, right);
+                this->OnAudioFunction(left, right);
+                this->apu->ready_for_samples = false;
             }
         }
     }
@@ -93,4 +104,9 @@ void GameBoy::ReleaseButton(InputButton button)
 void GameBoy::OnDraw(const DrawFunction onDraw)
 {
     this->OnDrawFunction = onDraw;
+}
+
+void GameBoy::OnAudio(const AudioFunction onAudio)
+{
+    this->OnAudioFunction = onAudio;
 }

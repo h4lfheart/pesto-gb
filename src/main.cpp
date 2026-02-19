@@ -3,6 +3,7 @@
 
 #include "emulator/gameboy.h"
 #include "sdl/display.h"
+#include "sdl/audio.h"
 
 int main(int argc, char** argv)
 {
@@ -17,6 +18,17 @@ int main(int argc, char** argv)
     game_boy.OnDraw([&](uint8_t* data)
     {
         display.Update(data);
+    });
+
+    auto audio = Audio();
+    if (!audio.Initialize()) {
+        fprintf(stderr, "Failed to initialize audio");
+        return 1;
+    }
+
+    game_boy.OnAudio([&](float left, float right)
+    {
+        audio.PushSample(left, right);
     });
 
     std::thread game_thread([&]{
@@ -97,6 +109,7 @@ int main(int argc, char** argv)
     }
 
     game_thread.join();
+    audio.Close();
 
     return 0;
 }
