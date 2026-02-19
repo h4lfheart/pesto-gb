@@ -15,8 +15,6 @@
 
 #define CH3_NR32_VOLUME_MASK 0b01100000
 
-#define CH3_PERIOD_MULTIPLIER 2
-
 class Channel3 : public BaseChannel
 {
 public:

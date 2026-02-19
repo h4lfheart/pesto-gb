@@ -19,7 +19,7 @@ void APU::Cycle()
     }
 
     this->frame_counter++;
-    if (this->frame_counter >= APU_FRAME_SEQUENCER_RATE)
+    if (this->frame_counter >= APU_FRAME_RATE)
     {
         this->frame_counter = 0;
         TickFrame();
@@ -37,6 +37,7 @@ void APU::Cycle()
     this->channel1->Tick();
     this->channel2->Tick();
     this->channel3->Tick();
+    this->channel3->Tick();
     this->channel4->Tick();
 
     const float channel1_data = this->channel1->GetOutput() / APU_MAX_VOLUME;
@@ -53,8 +54,11 @@ void APU::Cycle()
     if (panning & APU_NR51_CH4_LEFT_MASK) left += channel4_data;
     if (panning & APU_NR51_CH4_RIGHT_MASK) right += channel4_data;
 
-    left *= (left_volume / APU_VOLUME_DIVISOR) * APU_MIX_SCALE;
-    right *= (right_volume / APU_VOLUME_DIVISOR) * APU_MIX_SCALE;
+    left /= APU_CHANNEL_COUNT;
+    right /= APU_CHANNEL_COUNT;
+
+    left *= static_cast<float>(left_volume) / APU_VOLUME_DIVISOR;
+    right *= static_cast<float>(right_volume) / APU_VOLUME_DIVISOR;
 
     control &= APU_NR52_ENABLE_MASK;
     if (this->channel1->IsEnabled()) control |= APU_NR52_CH1_ENABLE_MASK;

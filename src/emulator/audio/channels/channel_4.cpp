@@ -31,7 +31,7 @@ void Channel4::Tick()
     {
         const uint8_t shift = (nr43 & CH4_NR43_CLOCK_SHIFT_MASK) >> 4;
         const uint8_t divider = nr43 & CH4_NR43_CLOCK_DIVIDER_MASK;
-        this->period_timer = (divider == 0 ? 8 : static_cast<uint8_t>(pow(2, divider))) << shift;
+        this->period_timer = (divider == 0 ? 8 : divider << 4) << shift;
 
         const uint8_t xor_value = ((this->lfsr & 1) ^ ((this->lfsr >> 1) & 1));
         this->lfsr = xor_value << 14 | (this->lfsr >> 1);
@@ -73,7 +73,7 @@ void Channel4::Enable()
 
     const uint8_t shift = (nr43 & CH4_NR43_CLOCK_SHIFT_MASK) >> 4;
     const uint8_t divider = nr43 & CH4_NR43_CLOCK_DIVIDER_MASK;
-    this->period_timer = (divider == 0 ? 8 : static_cast<uint8_t>(pow(2, divider))) << shift;
+    this->period_timer = (divider == 0 ? 8 : divider << 4) << shift;
 }
 
 void Channel4::TickLength()

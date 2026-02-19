@@ -21,7 +21,7 @@ void di(Cpu* cpu, InstructionRuntime* instr)
 
 void ei(Cpu* cpu, InstructionRuntime* instr)
 {
-   cpu->ime = true;
+   cpu->ime_pending = true;
 }
 
 void daa(Cpu* cpu, InstructionRuntime* instr)
@@ -295,7 +295,16 @@ void ld_r16_r16_s8(Cpu* cpu, InstructionRuntime* instr)
    uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
    uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
 
-   *reg1 = *reg2 + instr->imm.s8;
+   const int8_t offset = instr->imm.s8;
+   *reg1 = *reg2 + offset;
+
+   const uint8_t half_carry = HALF_CARRY_ADD(*reg2 & 0xFF, static_cast<uint8_t>(offset));
+   const uint8_t carry = ((*reg2 & 0xFF) + static_cast<uint8_t>(offset)) > 0xFF;
+
+   cpu->reg.SetFlag(FlagType::FLAG_Z, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_N, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_H, half_carry);
+   cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
 void ld_r16_d16(Cpu* cpu, InstructionRuntime* instr)

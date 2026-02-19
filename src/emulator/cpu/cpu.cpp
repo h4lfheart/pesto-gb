@@ -1,8 +1,5 @@
 #include "cpu.h"
-
 #include <cstdio>
-#include <process.h>
-
 #include "instruction/instruction_def.h"
 #include "instruction/instruction_set.h"
 
@@ -16,70 +13,79 @@ void Cpu::AttachMemory(Memory* mem)
     this->memory = mem;
 }
 
-void Cpu::Cycle()
+int Cpu::Cycle()
 {
-    this->cycles++;
-
-    if (this->cur_instr_cycles > 0)
+    if (this->ime_pending)
     {
-        this->cur_instr_cycles--;
-        return;
-    }
-
-    if (TryExecuteInterrupts())
-    {
-        this->halt = false;
-        return;
+        this->ime_pending = false;
+        this->ime = true;
     }
 
     if (this->halt)
-        return;
-
-    InstructionRuntime* instruction = InstructionRuntime::From(this->memory, this->reg.PC);
-    if (instruction == nullptr)
     {
-        uint8_t op = this->memory->Read8(this->reg.PC);
-        fprintf(stderr, "Unknown Instruction at 0x%.4X: 0x%.2X\n\n", this->reg.PC, op == 0xCB ? op << 8 | this->memory->Read8(this->reg.PC + 1) : op);
-        exit(1);
-        return;
+        const uint8_t interrupt_flag = this->memory->ReadIO(IO_ADDR_INTERRUPT_FLAG);
+        const uint8_t pending = (this->memory->ie & interrupt_flag) & INTERRUPT_MASK;
+        if (pending)
+            this->halt = false;
     }
 
-    this->reg.PC += instruction->def->size;
+    int mcycles = 0;
 
-    instruction->Execute(this);
+    if (this->ime && TryExecuteInterrupts())
+    {
+        mcycles = INTERRUPT_MCYCLES;
+    }
+    else if (this->halt)
+    {
+        mcycles = 1;
+    }
+    else
+    {
+        InstructionRuntime* instr = InstructionRuntime::From(this->memory, this->reg.PC);
+        if (instr == nullptr)
+        {
+            uint8_t op = this->memory->Read8(this->reg.PC);
+            fprintf(stderr, "Unknown instruction at 0x%.4X: 0x%.2X\n", this->reg.PC, op == 0xCB? (op << 8) | this->memory->Read8(this->reg.PC + 1): op);
+            exit(1);
+        }
 
-    this->cur_instr_cycles = instruction->cycles;
+        this->reg.PC += instr->def->size;
+        instr->Execute(this);
+        mcycles = instr->cycles;
+    }
+
+    this->cycles += mcycles;
+    return mcycles;
 }
 
 bool Cpu::TryExecuteInterrupts()
 {
-    if (!this->ime)
-        return false;
-
     const uint8_t interrupt_flag = this->memory->ReadIO(IO_ADDR_INTERRUPT_FLAG);
-    const uint8_t interrupts = (this->memory->ie & interrupt_flag) & INTERRUPT_MASK;
-    if (interrupts == 0)
+    const uint8_t pending = (this->memory->ie & interrupt_flag) & INTERRUPT_MASK;
+    if (pending == 0)
         return false;
 
     this->ime = false;
 
-    if (interrupts & INTERRUPT_VBLANK)
+    struct { uint8_t mask; uint16_t addr; } handlers[] = {
+        { INTERRUPT_VBLANK, INT_ADDR_VBLANK   },
+        { INTERRUPT_STAT,   INT_ADDR_LCD_STAT },
+        { INTERRUPT_TIMER,  INT_ADDR_TIMER    },
+        { INTERRUPT_SERIAL, INT_ADDR_SERIAL   },
+        { INTERRUPT_JOYPAD, INT_ADDR_JOYPAD   },
+    };
+
+    for (const auto& [mask, addr] : handlers)
     {
-        this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~INTERRUPT_VBLANK);
-        ExecuteInterrupt(INT_ADDR_VBLANK);
-    }
-    else if (interrupts & INTERRUPT_JOYPAD)
-    {
-        this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~INTERRUPT_JOYPAD);
-        ExecuteInterrupt(INT_ADDR_JOYPAD);
-    }
-    else if (interrupts & INTERRUPT_STAT)
-    {
-        this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~INTERRUPT_STAT);
-        ExecuteInterrupt(INT_ADDR_LCD_STAT);
+        if (pending & mask)
+        {
+            this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~mask);
+            ExecuteInterrupt(addr);
+            return true;
+        }
     }
 
-    return true;
+    return false;
 }
 
 void Cpu::Push16(uint16_t value)

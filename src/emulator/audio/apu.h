@@ -34,10 +34,11 @@
 #define APU_NR52_CH4_ENABLE_MASK 0b00001000
 #define APU_NR52_ENABLE_MASK 0b10000000
 
-#define APU_FRAME_SEQUENCER_RATE 8192
+#define APU_FRAME_RATE 8192
 #define APU_MAX_VOLUME 15.0f
 #define APU_VOLUME_DIVISOR 8.0f
 #define APU_MIX_SCALE 0.25f
+#define APU_CHANNEL_COUNT 4
 
 class APU
 {
@@ -49,6 +50,7 @@ public:
     void GetSamples(float& left, float& right) const;
 
     bool ready_for_samples = false;
+    Channel3* channel3 = nullptr;
 
 private:
     void TickFrame();
@@ -57,7 +59,6 @@ private:
 
     Channel1* channel1 = nullptr;
     Channel2* channel2 = nullptr;
-    Channel3* channel3 = nullptr;
     Channel4* channel4 = nullptr;
 
     uint32_t sample_counter = 0;

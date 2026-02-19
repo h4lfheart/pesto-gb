@@ -55,14 +55,21 @@ void GameBoy::Run()
 
         last_time = current_time;
 
-        int frame_cycles = CYCLES_PER_FRAME;
-        while (frame_cycles--)
+        int frame_mcycles = (CLOCK_RATE / T_CYCLES_PER_M_CYCLE) / FRAMES_PER_SECOND;
+        while (frame_mcycles > 0)
         {
-            this->cpu->Cycle();
-            this->ppu->Cycle();
-            this->apu->Cycle();
+            const int mcycles = this->cpu->Cycle();
+            const int tcycles = mcycles * T_CYCLES_PER_M_CYCLE;
+            frame_mcycles -= mcycles;
+
+            for (int t = 0; t < tcycles; t++)
+            {
+                this->ppu->Cycle();
+                this->apu->Cycle();
+                this->timer->Cycle();
+            }
+
             this->input->Cycle();
-            this->timer->Cycle();
 
             if (this->ppu->ready_for_draw)
             {
