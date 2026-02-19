@@ -2,16 +2,14 @@
 
 void Channel2::Tick()
 {
-    uint8_t nr11 = this->memory->ReadIO(CH2_NR21_ADDR);
-    const uint8_t nr12 = this->memory->ReadIO(CH2_NR22_ADDR);
-    uint8_t nr13 = this->memory->ReadIO(CH2_NR23_ADDR);
-    const uint8_t nr14 = this->memory->ReadIO(CH2_NR24_ADDR);
+    const uint8_t nr22 = this->memory->ReadIO(CH2_NR22_ADDR);
+    const uint8_t nr24 = this->memory->ReadIO(CH2_NR24_ADDR);
 
-    this->is_dac_enabled = (nr12 & CH_NRx2_DAC_MASK) != 0;
+    this->is_dac_enabled = (nr22 & CH_NRx2_DAC_MASK) != 0;
 
-    if (nr14 & CH_NRx4_TRIGGER_MASK)
+    if (nr24 & CH_NRx4_TRIGGER_MASK)
     {
-        memory->WriteIO(CH2_NR24_ADDR, nr14 & ~CH_NRx4_TRIGGER_MASK);
+        memory->WriteIO(CH2_NR24_ADDR, nr24 & ~CH_NRx4_TRIGGER_MASK);
 
         if (this->is_dac_enabled)
         {
@@ -49,26 +47,26 @@ void Channel2::TickFrame(uint8_t frame_idx)
 
 void Channel2::Enable()
 {
-    const uint8_t nr11 = this->memory->ReadIO(CH2_NR21_ADDR);
-    const uint8_t nr12 = this->memory->ReadIO(CH2_NR22_ADDR);
-    const uint8_t nr13 = this->memory->ReadIO(CH2_NR23_ADDR);
-    const uint8_t nr14 = this->memory->ReadIO(CH2_NR24_ADDR);
+    const uint8_t nr21 = this->memory->ReadIO(CH2_NR21_ADDR);
+    const uint8_t nr22 = this->memory->ReadIO(CH2_NR22_ADDR);
+    const uint8_t nr23 = this->memory->ReadIO(CH2_NR23_ADDR);
+    const uint8_t nr24 = this->memory->ReadIO(CH2_NR24_ADDR);
 
     this->is_enabled = true;
 
-    this->period = ((nr14 & CH_NRx4_PERIOD_HIGH_MASK) << 8) | nr13;
-    this->volume = (nr12 & CH_NRx2_VOLUME_MASK) >> 4;
-    this->duty_type = (nr11 & CH_NRx1_DUTY_TYPE_MASK) >> 6;
+    this->period = ((nr24 & CH_NRx4_PERIOD_HIGH_MASK) << 8) | nr23;
+    this->volume = (nr22 & CH_NRx2_VOLUME_MASK) >> 4;
+    this->duty_type = (nr21 & CH_NRx1_DUTY_TYPE_MASK) >> 6;
 
     this->period_timer = (CH_PERIOD_START - this->period) * CH_PERIOD_MULTIPLIER;
-    this->length_timer = nr11 & CH_NRx1_LENGTH_MASK;
+    this->length_timer = nr21 & CH_NRx1_LENGTH_MASK;
     this->envelope_timer = 0;
 }
 
 void Channel2::TickLength()
 {
-    const uint8_t nr14 = this->memory->ReadIO(CH2_NR24_ADDR);
-    if ((nr14 & CH_NRx4_LENGTH_ENABLE_MASK) == 0)
+    const uint8_t nr24 = this->memory->ReadIO(CH2_NR24_ADDR);
+    if ((nr24 & CH_NRx4_LENGTH_ENABLE_MASK) == 0)
         return;
 
     this->length_timer--;
@@ -78,8 +76,8 @@ void Channel2::TickLength()
 
 void Channel2::TickEnvelope()
 {
-    const uint8_t nr12 = this->memory->ReadIO(CH2_NR22_ADDR);
-    const uint8_t pace = nr12 & CH_NRx2_ENV_PACE_MASK;
+    const uint8_t nr22 = this->memory->ReadIO(CH2_NR22_ADDR);
+    const uint8_t pace = nr22 & CH_NRx2_ENV_PACE_MASK;
     if (pace == 0)
         return;
 
@@ -88,7 +86,7 @@ void Channel2::TickEnvelope()
     {
         this->envelope_timer = 0;
 
-        bool increase_volume = nr12 & CH_NRx2_ENVELOPE_DIR_MASK;
+        bool increase_volume = nr22 & CH_NRx2_ENVELOPE_DIR_MASK;
         if (increase_volume && this->volume < 0xF)
         {
             this->volume++;

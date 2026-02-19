@@ -938,6 +938,19 @@ void cpl(Cpu* cpu, InstructionRuntime* instr)
 }
 
 // CB
+void rlc_r8(Cpu* cpu, InstructionRuntime* instr)
+{
+   uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
+
+   const uint8_t carry_bit = (*reg >> 7) & 1;
+   *reg = (*reg << 1) | carry_bit;
+
+   cpu->reg.SetFlag(FlagType::FLAG_Z, *reg == 0);
+   cpu->reg.SetFlag(FlagType::FLAG_N, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_H, 0);
+   cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
+}
+
 void rrc_r8(Cpu* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
@@ -1270,6 +1283,10 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
 
    new InstructionDef("SBC A, B", 0x98, sbc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_B),
    new InstructionDef("SBC A, C", 0x99, sbc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_C),
+   new InstructionDef("SBC A, D", 0x9A, sbc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_D),
+   new InstructionDef("SBC A, E", 0x9B, sbc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_E),
+   new InstructionDef("SBC A, H", 0x9C, sbc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_H),
+   new InstructionDef("SBC A, L", 0x9D, sbc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_L),
 
    new InstructionDef("AND A, B", 0xA0, and_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_B),
    new InstructionDef("AND A, C", 0xA1, and_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_C),
@@ -1356,6 +1373,15 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
 };
 
 InstructionDef* InstructionSet::prefix_instructions[INSTRUCTION_SET_SIZE] = {
+
+   new InstructionDef("RLC B", 0x00, rlc_r8, 2,2,2, RegisterType::REG_B),
+   new InstructionDef("RLC C", 0x01, rlc_r8, 2, 2, 2, RegisterType::REG_C),
+   new InstructionDef("RLC D", 0x02, rlc_r8, 2, 2, 2, RegisterType::REG_D),
+   new InstructionDef("RLC E", 0x03, rlc_r8, 2,2,2, RegisterType::REG_E),
+   new InstructionDef("RLC H", 0x04, rlc_r8, 2, 2, 2, RegisterType::REG_H),
+   new InstructionDef("RLC L", 0x05, rlc_r8, 2, 2, 2, RegisterType::REG_L),
+   new InstructionDef("RLC A", 0x07, rlc_r8, 2, 2, 2, RegisterType::REG_A),
+
    new InstructionDef("RRC B", 0x08, rrc_r8, 2,2,2, RegisterType::REG_B),
    new InstructionDef("RRC C", 0x09, rrc_r8, 2, 2, 2, RegisterType::REG_C),
    new InstructionDef("RRC D", 0x0A, rrc_r8, 2, 2, 2, RegisterType::REG_D),

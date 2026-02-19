@@ -6,6 +6,7 @@
 
 #include "channels/channel_1.h"
 #include "channels/channel_2.h"
+#include "channels/channel_3.h"
 
 #define APU_SAMPLE_RATE 44100
 #define APU_CYCLES_PER_SAMPLE (CLOCK_RATE / APU_SAMPLE_RATE)
@@ -55,6 +56,7 @@ private:
 
     Channel1* channel1 = nullptr;
     Channel2* channel2 = nullptr;
+    Channel3* channel3 = nullptr;
 
     uint32_t sample_counter = 0;
     uint32_t frame_counter = 0;
