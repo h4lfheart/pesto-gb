@@ -57,10 +57,10 @@ void Channel3::Enable()
     this->period = ((nr34 & CH_NRx4_PERIOD_HIGH_MASK) << 8) | nr33;
     this->volume = (nr32 & CH3_NR32_VOLUME_MASK) >> 5;
 
-    this->period_timer = (CH_PERIOD_START - this->period) * CH_PERIOD_MULTIPLIER;
-    this->length_timer = nr31;
+    this->period_timer = (CH_PERIOD_START - this->period) * CH3_PERIOD_MULTIPLIER;
+    this->length_timer = CH_8BIT_LENGTH_MAX - nr31;
 
-    this->wave_step = 1;
+    this->wave_step = 0;
 }
 
 void Channel3::TickLength()

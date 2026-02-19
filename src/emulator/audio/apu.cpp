@@ -5,6 +5,7 @@ APU::APU()
     this->channel1 = new Channel1();
     this->channel2 = new Channel2();
     this->channel3 = new Channel3();
+    this->channel4 = new Channel4();
 }
 
 void APU::Cycle()
@@ -36,10 +37,12 @@ void APU::Cycle()
     this->channel1->Tick();
     this->channel2->Tick();
     this->channel3->Tick();
+    this->channel4->Tick();
 
     const float channel1_data = this->channel1->GetOutput() / APU_MAX_VOLUME;
     const float channel2_data = this->channel2->GetOutput() / APU_MAX_VOLUME;
     const float channel3_data = this->channel3->GetOutput() / APU_MAX_VOLUME;
+    const float channel4_data = this->channel4->GetOutput() / APU_MAX_VOLUME;
 
     if (panning & APU_NR51_CH1_LEFT_MASK) left += channel1_data;
     if (panning & APU_NR51_CH1_RIGHT_MASK) right += channel1_data;
@@ -47,6 +50,8 @@ void APU::Cycle()
     if (panning & APU_NR51_CH2_RIGHT_MASK) right += channel2_data;
     if (panning & APU_NR51_CH3_LEFT_MASK) left += channel3_data;
     if (panning & APU_NR51_CH3_RIGHT_MASK) right += channel3_data;
+    if (panning & APU_NR51_CH4_LEFT_MASK) left += channel4_data;
+    if (panning & APU_NR51_CH4_RIGHT_MASK) right += channel4_data;
 
     left *= (left_volume / APU_VOLUME_DIVISOR) * APU_MIX_SCALE;
     right *= (right_volume / APU_VOLUME_DIVISOR) * APU_MIX_SCALE;
@@ -55,6 +60,7 @@ void APU::Cycle()
     if (this->channel1->IsEnabled()) control |= APU_NR52_CH1_ENABLE_MASK;
     if (this->channel2->IsEnabled()) control |= APU_NR52_CH2_ENABLE_MASK;
     if (this->channel3->IsEnabled()) control |= APU_NR52_CH3_ENABLE_MASK;
+    if (this->channel4->IsEnabled()) control |= APU_NR52_CH4_ENABLE_MASK;
     this->memory->WriteIO(APU_NR52_ADDR, control);
 
     this->sample_counter++;
@@ -74,6 +80,7 @@ void APU::AttachMemory(Memory* mem)
     this->channel1->AttachMemory(mem);
     this->channel2->AttachMemory(mem);
     this->channel3->AttachMemory(mem);
+    this->channel4->AttachMemory(mem);
 }
 
 void APU::GetSamples(float& left, float& right) const
@@ -87,6 +94,7 @@ void APU::TickFrame()
     this->channel1->TickFrame(frame_step);
     this->channel2->TickFrame(frame_step);
     this->channel3->TickFrame(frame_step);
+    this->channel4->TickFrame(frame_step);
 
     this->frame_step = (this->frame_step + 1) & 7;
 }

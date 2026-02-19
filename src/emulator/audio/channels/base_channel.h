@@ -18,6 +18,9 @@
 #define CH_DUTY_STEP_MASK 0b111
 #define CH_MAX_VOLUME 0xF
 
+#define CH_6BIT_LENGTH_MAX 64
+#define CH_8BIT_LENGTH_MAX 256
+
 
 class BaseChannel
 {
