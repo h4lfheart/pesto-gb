@@ -31,6 +31,10 @@ int main(int argc, char** argv)
         audio.PushSample(left, right);
     });
 
+    const auto rom_path = std::string(argv[2]);
+    const auto save_path = rom_path.substr(0, rom_path.find_last_of('.')) + ".sav";
+    game_boy.ReadSave(save_path.c_str());
+
     std::thread game_thread([&]{
         game_boy.Run();
     });
@@ -108,6 +112,7 @@ int main(int argc, char** argv)
         }
     }
 
+    game_boy.WriteSave(save_path.c_str());
     game_thread.join();
     audio.Close();
 

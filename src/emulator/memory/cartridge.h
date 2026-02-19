@@ -29,6 +29,8 @@ public:
     Cartridge();
 
     void LoadRom(char* rom_path);
+    void ReadSave(const char* path);
+    void WriteSave(const char* path);
 
     char* GetTitle();
     const char* GetCartridgeType() const;

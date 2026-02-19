@@ -117,3 +117,13 @@ void GameBoy::OnAudio(const AudioFunction onAudio)
 {
     this->OnAudioFunction = onAudio;
 }
+
+void GameBoy::ReadSave(const char* path)
+{
+    this->cartridge->ReadSave(path);
+}
+
+void GameBoy::WriteSave(const char* path)
+{
+    this->cartridge->WriteSave(path);
+}

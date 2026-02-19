@@ -34,6 +34,32 @@ void Cartridge::LoadRom(char* rom_path)
     mbc = MBC::CreateMBC(header.cartridge_type);
 }
 
+void Cartridge::ReadSave(const char* path)
+{
+    if (!this->mbc->HasBattery())
+        return;
+
+    FILE* file = fopen(path, "rb");
+    if (file == nullptr)
+        return;
+
+    fread(ram, 1, GetRamSize(), file);
+    fclose(file);
+}
+
+void Cartridge::WriteSave(const char* path)
+{
+    if (!this->mbc->HasBattery())
+        return;
+
+    FILE* file = fopen(path, "wb");
+    if (file == nullptr)
+        return;
+
+    fwrite(ram, 1, GetRamSize(), file);
+    fclose(file);
+}
+
 void Cartridge::ReadHeader()
 {
     if (this->rom_data == nullptr)

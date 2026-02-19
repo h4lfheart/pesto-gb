@@ -27,6 +27,9 @@ public:
     void OnDraw(DrawFunction onDraw);
     void OnAudio(AudioFunction onAudio);
 
+    void ReadSave(const char* path);
+    void WriteSave(const char* path);
+
     DrawFunction OnDrawFunction;
     AudioFunction OnAudioFunction;
 
