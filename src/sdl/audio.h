@@ -22,20 +22,17 @@ public:
     static void AudioCallback(void* userdata, uint8_t* stream, int len);
 
 private:
-    SDL_AudioDeviceID device_id;
+    SDL_AudioDeviceID device_id = 0;
     SDL_AudioSpec audio_spec;
 
     std::vector<float> sample_buffer;
-    size_t buffer_write_pos;
-    size_t buffer_read_pos;
-    size_t buffer_size;
+    size_t buffer_write_pos = 0;
+    size_t buffer_read_pos = 0;
+    size_t buffer_size = BUFFER_SIZE * CHANNELS * 4;
     std::mutex buffer_mutex;
 
-    float time_accumulator;
-    float last_left;
-    float last_right;
+    float last_left = 0.0f;
+    float last_right = 0.0f;
 
     void AudioCallbackImpl(uint8_t* stream, int len);
-    float hp_prev_in_left = 0.0f,  hp_prev_out_left = 0.0f;
-    float hp_prev_in_right = 0.0f, hp_prev_out_right = 0.0f;
 };

@@ -3,13 +3,6 @@
 #include <cstring>
 
 Audio::Audio()
-    : device_id(0)
-    , buffer_write_pos(0)
-    , buffer_read_pos(0)
-    , buffer_size(BUFFER_SIZE * CHANNELS * 4)
-    , time_accumulator(0.0f)
-    , last_left(0.0f)
-    , last_right(0.0f)
 {
     sample_buffer.resize(buffer_size, 0.0f);
 }

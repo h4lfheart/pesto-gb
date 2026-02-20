@@ -56,7 +56,7 @@ void APU::Cycle()
     left /= APU_CHANNEL_COUNT;
     right /= APU_CHANNEL_COUNT;
 
-    left *= static_cast<float>(left_volume + 1) / APU_VOLUME_DIVISOR;
+    left *= static_cast<float>(left_volume) / APU_VOLUME_DIVISOR;
     right *= static_cast<float>(right_volume) / APU_VOLUME_DIVISOR;
 
     control &= APU_NR52_ENABLE_MASK;
@@ -71,8 +71,14 @@ void APU::Cycle()
     {
         this->sample_counter = 0;
 
-        this->sample_left = left;
-        this->sample_right = right;
+        const bool dac_enabled = this->channel1->IsDACEnabled()
+                                || this->channel2->IsDACEnabled()
+                                || this->channel3->IsDACEnabled()
+                                || this->channel4->IsDACEnabled();
+
+        this->sample_left = HighPass(left,  dac_enabled, this->capacitor_left) * 2;
+        this->sample_right = HighPass(right, dac_enabled, this->capacitor_right) * 2;
+
         this->ready_for_samples = true;
     }
 }
@@ -100,4 +106,19 @@ void APU::TickFrame()
     this->channel4->TickFrame(frame_step);
 
     this->frame_step = (this->frame_step + 1) & 7;
+}
+
+float APU::HighPass(float in, bool dac_enabled, float& capacitor)
+{
+    float out = 0.0f;
+    if (dac_enabled)
+    {
+        out = in - capacitor;
+        capacitor = in - out * APU_HIGH_PASS_FACTOR;
+    }
+    else
+    {
+        capacitor = 0.0f;
+    }
+    return out;
 }

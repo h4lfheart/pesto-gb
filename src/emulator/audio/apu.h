@@ -36,9 +36,11 @@
 
 #define APU_FRAME_RATE 8192
 #define APU_MAX_VOLUME 15.0f
-#define APU_VOLUME_DIVISOR 8.0f
+#define APU_VOLUME_DIVISOR 7.0f
 #define APU_MIX_SCALE 0.25f
 #define APU_CHANNEL_COUNT 4
+
+#define APU_HIGH_PASS_FACTOR 0.996f
 
 class APU
 {
@@ -55,6 +57,8 @@ public:
 private:
     void TickFrame();
 
+    float HighPass(float in, bool dac_enabled, float& capacitor);
+
     Memory* memory = nullptr;
 
     Channel1* channel1 = nullptr;
@@ -67,4 +71,7 @@ private:
 
     float sample_left = 0.0f;
     float sample_right = 0.0f;
+
+    float capacitor_left  = 0.0f;
+    float capacitor_right = 0.0f;
 };
