@@ -43,6 +43,7 @@ public:
     Registers reg = {};
     uint64_t cycles = 0;
 
+    bool stop = false;
     bool halt = false;
     bool ime = false;
     bool ime_pending = false;

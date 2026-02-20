@@ -15,11 +15,7 @@ void Cpu::AttachMemory(Memory* mem)
 
 int Cpu::Cycle()
 {
-    if (this->ime_pending)
-    {
-        this->ime_pending = false;
-        this->ime = true;
-    }
+    bool ime_was_pending = this->ime_pending;
 
     if (this->halt)
     {
@@ -52,6 +48,12 @@ int Cpu::Cycle()
         this->reg.PC += instr->def->size;
         instr->Execute(this);
         mcycles = instr->cycles;
+    }
+
+    if (ime_was_pending)
+    {
+        this->ime_pending = false;
+        this->ime = true;
     }
 
     this->cycles += mcycles;

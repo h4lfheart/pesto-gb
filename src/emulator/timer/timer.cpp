@@ -4,10 +4,10 @@
 
 static uint16_t clock_rates[4] =
 {
-    256,
-    4,
+    1024,
     16,
-    64
+    64,
+    256
 };
 
 Timer::Timer()
