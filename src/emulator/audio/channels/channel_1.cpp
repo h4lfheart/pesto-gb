@@ -52,6 +52,7 @@ void Channel1::TickFrame(uint8_t frame_idx)
 
 void Channel1::Enable()
 {
+    const uint8_t nr10 = this->memory->ReadIO(CH1_NR10_ADDR);
     const uint8_t nr11 = this->memory->ReadIO(CH1_NR11_ADDR);
     const uint8_t nr12 = this->memory->ReadIO(CH1_NR12_ADDR);
     const uint8_t nr13 = this->memory->ReadIO(CH1_NR13_ADDR);
@@ -64,11 +65,21 @@ void Channel1::Enable()
     this->duty_type = (nr11 & CH_NRx1_DUTY_TYPE_MASK) >> 6;
 
     this->period_timer = (CH_PERIOD_START - this->period) * CH_PERIOD_MULTIPLIER;
-    this->length_timer = CH_6BIT_LENGTH_MAX - (nr11 & CH_NRx1_LENGTH_MASK);
-    this->envelope_timer = 0;
-    this->sweep_timer = 0;
 
+    if (this->length_timer == 0)
+        this->length_timer = CH_6BIT_LENGTH_MAX - (nr11 & CH_NRx1_LENGTH_MASK);
+
+    this->envelope_timer = 0;
+
+    const uint8_t shift = nr10 & CH1_NR10_SWEEP_SHIFT_MASK;
+    const uint8_t sweep_pace = (nr10 & CH1_NR10_SWEEP_PACE_MASK) >> 4;
     this->sweep_period = this->period;
+    this->sweep_timer = sweep_pace != 0 ? sweep_pace : 8;
+    this->sweep_enable = (sweep_pace != 0) || (shift != 0);
+
+    if (shift != 0) {
+        CalculateSweepPeriod();
+    }
 }
 
 void Channel1::TickLength()
@@ -110,35 +121,42 @@ void Channel1::TickSweep()
 {
     const uint8_t nr10 = this->memory->ReadIO(CH1_NR10_ADDR);
     const uint8_t sweep_pace = (nr10 & CH1_NR10_SWEEP_PACE_MASK) >> 4;
-    if (sweep_pace == 0)
-        return;
+    const uint8_t shift = nr10 & CH1_NR10_SWEEP_SHIFT_MASK;
 
-    this->sweep_timer++;
-    if (this->sweep_timer >= sweep_pace)
-    {
-        this->sweep_timer = 0;
+    if (this->sweep_timer > 0)
+        this->sweep_timer--;
 
-        const uint8_t shift = nr10 & CH1_NR10_SWEEP_SHIFT_MASK;
-        const bool decrease = nr10 & CH1_NR10_SWEEP_DIR_MASK;
-        const uint16_t offset = sweep_period >> shift;
+    if (this->sweep_timer == 0) {
+        this->sweep_timer = sweep_pace != 0 ? sweep_pace : 8;
 
-        const uint16_t new_period = decrease ? sweep_period - offset : sweep_period + offset;
-        if (new_period > CH1_MAX_SWEEP_PERIOD)
-        {
-            this->is_enabled = false;
-            return;
+        if (this->sweep_enable && sweep_pace != 0) {
+            uint16_t new_period = CalculateSweepPeriod();
+
+            if (new_period <= CH1_MAX_SWEEP_PERIOD && shift != 0) {
+                this->sweep_period = new_period;
+                this->period = new_period;
+                memory->WriteIO(CH1_NR13_ADDR, new_period & 0xFF);
+                const uint8_t nr14 = memory->ReadIO(CH1_NR14_ADDR);
+                memory->WriteIO(CH1_NR14_ADDR,
+                    (nr14 & ~CH_NRx4_PERIOD_HIGH_MASK) | ((new_period >> 8) & CH_NRx4_PERIOD_HIGH_MASK));
+
+                CalculateSweepPeriod();
+            }
         }
-
-        if (new_period <= CH1_MAX_SWEEP_PERIOD && shift > 0)
-        {
-            sweep_period = new_period;
-            period = new_period;
-
-            memory->WriteIO(CH1_NR13_ADDR, new_period & 0xFF);
-
-            const uint8_t nr14 = memory->ReadIO(CH1_NR14_ADDR);
-            memory->WriteIO(CH1_NR14_ADDR, (nr14 & ~CH_NRx4_PERIOD_HIGH_MASK) | ((new_period >> 8) & CH_NRx4_PERIOD_HIGH_MASK));
-        }
-
     }
+}
+
+uint16_t Channel1::CalculateSweepPeriod()
+{
+    const uint8_t nr10 = this->memory->ReadIO(CH1_NR10_ADDR);
+    const uint8_t shift = nr10 & CH1_NR10_SWEEP_SHIFT_MASK;
+    const bool decrease = nr10 & CH1_NR10_SWEEP_DIR_MASK;
+
+    const uint16_t offset = this->sweep_period >> shift;
+    const uint16_t new_period = decrease ? sweep_period - offset : sweep_period + offset;
+
+    if (new_period > CH1_MAX_SWEEP_PERIOD)
+        this->is_enabled = false;
+
+    return new_period;
 }

@@ -59,7 +59,10 @@ void Channel2::Enable()
     this->duty_type = (nr21 & CH_NRx1_DUTY_TYPE_MASK) >> 6;
 
     this->period_timer = (CH_PERIOD_START - this->period) * CH_PERIOD_MULTIPLIER;
-    this->length_timer = CH_6BIT_LENGTH_MAX - (nr21 & CH_NRx1_LENGTH_MASK);
+
+    if (this->length_timer == 0)
+        this->length_timer = CH_6BIT_LENGTH_MAX - (nr21 & CH_NRx1_LENGTH_MASK);
+
     this->envelope_timer = 0;
 }
 

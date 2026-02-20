@@ -66,7 +66,9 @@ void Channel4::Enable()
 
     this->volume = (nr42 & CH_NRx2_VOLUME_MASK) >> 4;
 
-    this->length_timer = CH_6BIT_LENGTH_MAX - (nr41 & CH_NRx1_LENGTH_MASK);
+    if (this->length_timer == 0)
+        this->length_timer = CH_6BIT_LENGTH_MAX - (nr41 & CH_NRx1_LENGTH_MASK);
+
     this->envelope_timer = 0;
 
     this->lfsr = CH4_LFSR_DEFAULT;

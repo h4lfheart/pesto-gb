@@ -25,6 +25,8 @@ private:
     void TickEnvelope();
     void TickSweep();
 
+    uint16_t CalculateSweepPeriod();
+
     uint16_t period = 0;
     uint16_t period_timer = 0;
 
@@ -35,6 +37,7 @@ private:
     uint8_t length_timer = 0;
     uint8_t envelope_timer = 0;
 
+    bool sweep_enable = false;
     uint8_t sweep_timer = 0;
     uint16_t sweep_period = 0;
 };

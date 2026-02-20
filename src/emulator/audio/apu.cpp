@@ -37,7 +37,6 @@ void APU::Cycle()
     this->channel1->Tick();
     this->channel2->Tick();
     this->channel3->Tick();
-    this->channel3->Tick();
     this->channel4->Tick();
 
     const float channel1_data = this->channel1->GetOutput() / APU_MAX_VOLUME;
@@ -57,7 +56,7 @@ void APU::Cycle()
     left /= APU_CHANNEL_COUNT;
     right /= APU_CHANNEL_COUNT;
 
-    left *= static_cast<float>(left_volume) / APU_VOLUME_DIVISOR;
+    left *= static_cast<float>(left_volume + 1) / APU_VOLUME_DIVISOR;
     right *= static_cast<float>(right_volume) / APU_VOLUME_DIVISOR;
 
     control &= APU_NR52_ENABLE_MASK;
