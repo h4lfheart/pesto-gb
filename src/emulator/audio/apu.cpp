@@ -1,5 +1,7 @@
 #include "apu.h"
 
+#include <algorithm>
+
 APU::APU()
 {
     this->channel1 = new Channel1();
@@ -38,18 +40,23 @@ void APU::Cycle()
     this->channel3->Tick();
     this->channel4->Tick();
 
-    const float channel1_data = this->channel1->GetOutput() / APU_MAX_VOLUME;
-    const float channel2_data = this->channel2->GetOutput() / APU_MAX_VOLUME;
-    const float channel3_data = this->channel3->GetOutput() / APU_MAX_VOLUME;
-    const float channel4_data = this->channel4->GetOutput() / APU_MAX_VOLUME;
+    const float ch1_raw = this->channel1->GetOutput();
+    const float ch2_raw = this->channel2->GetOutput();
+    const float ch3_raw = this->channel3->GetOutput();
+    const float ch4_raw = this->channel4->GetOutput();
 
-    if (panning & APU_NR51_CH1_LEFT_MASK) left += channel1_data;
+    const float channel1_data = this->channel1->IsDACEnabled() ? (ch1_raw - this->channel1->volume * 0.5f) / APU_MAX_VOLUME : 0;
+    const float channel2_data = this->channel2->IsDACEnabled() ? (ch2_raw - this->channel2->volume * 0.5f) / APU_MAX_VOLUME : 0;
+    const float channel3_data = this->channel3->IsDACEnabled() ? (ch3_raw - this->channel3->dc_offset) / APU_MAX_VOLUME : 0;
+    const float channel4_data = this->channel4->IsDACEnabled() ? (ch4_raw - this->channel4->volume * 0.5f) / APU_MAX_VOLUME : 0;
+
+    if (panning & APU_NR51_CH1_LEFT_MASK) left  += channel1_data;
     if (panning & APU_NR51_CH1_RIGHT_MASK) right += channel1_data;
-    if (panning & APU_NR51_CH2_LEFT_MASK) left += channel2_data;
+    if (panning & APU_NR51_CH2_LEFT_MASK) left  += channel2_data;
     if (panning & APU_NR51_CH2_RIGHT_MASK) right += channel2_data;
-    if (panning & APU_NR51_CH3_LEFT_MASK) left += channel3_data;
+    if (panning & APU_NR51_CH3_LEFT_MASK) left  += channel3_data;
     if (panning & APU_NR51_CH3_RIGHT_MASK) right += channel3_data;
-    if (panning & APU_NR51_CH4_LEFT_MASK) left += channel4_data;
+    if (panning & APU_NR51_CH4_LEFT_MASK) left  += channel4_data;
     if (panning & APU_NR51_CH4_RIGHT_MASK) right += channel4_data;
 
     left /= APU_CHANNEL_COUNT;
@@ -63,13 +70,8 @@ void APU::Cycle()
     {
         this->sample_counter = 0;
 
-        const bool dac_enabled = this->channel1->IsDACEnabled()
-                                || this->channel2->IsDACEnabled()
-                                || this->channel3->IsDACEnabled()
-                                || this->channel4->IsDACEnabled();
-
-        this->sample_left = HighPass(left,  dac_enabled, this->capacitor_left) * 2;
-        this->sample_right = HighPass(right, dac_enabled, this->capacitor_right) * 2;
+        this->sample_left = std::clamp(left  * 2.0f, -1.0f, 1.0f);
+        this->sample_right = std::clamp(right * 2.0f, -1.0f, 1.0f);
 
         this->ready_for_samples = true;
     }
@@ -393,19 +395,4 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
     }
 
     io[offset] = value;
-}
-
-float APU::HighPass(float in, bool dac_enabled, float& capacitor)
-{
-    float out = 0.0f;
-    if (dac_enabled)
-    {
-        out = in - capacitor;
-        capacitor = in - out * APU_HIGH_PASS_FACTOR;
-    }
-    else
-    {
-        capacitor = 0.0f;
-    }
-    return out;
 }

@@ -38,6 +38,7 @@ void Channel3::Reset()
     wave_step = 0;
     volume = 0;
     length_timer = 0;
+    dc_offset = 0;
 }
 
 bool Channel3::IsDACEnabled()
@@ -69,6 +70,15 @@ void Channel3::Trigger()
         this->length_timer = CH_8BIT_LENGTH_MAX;
 
     this->wave_step = 0;
+
+    float sum = 0.0f;
+    for (int i = 0; i < 16; i++)
+    {
+        const uint8_t byte = this->memory->ReadIO(CH3_WAVE_RAM_START + i);
+        sum += static_cast<float>((byte >> 4) & 0xF);
+        sum += static_cast<float>(byte & 0xF);
+    }
+    this->dc_offset = sum / CH3_WAVE_SAMPLE_COUNT;
 }
 
 void Channel3::TickLength()

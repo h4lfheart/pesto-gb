@@ -41,4 +41,6 @@ public:
 
     uint8_t volume = 0;
     uint16_t length_timer = 0;
+
+    float dc_offset;
 };

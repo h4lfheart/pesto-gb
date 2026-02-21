@@ -43,8 +43,6 @@
 #define APU_REG_START 0x10
 #define APU_REG_END 0x26
 
-#define APU_HIGH_PASS_FACTOR 0.996f
-
 class APU
 {
 public:
@@ -63,8 +61,6 @@ private:
     uint8_t APURead(uint8_t* io, uint16_t offset);
     void APUWrite(uint8_t* io, uint16_t offset, uint8_t value);
 
-    float HighPass(float in, bool dac_enabled, float& capacitor);
-
     Memory* memory = nullptr;
 
     bool enabled = false;
@@ -79,7 +75,4 @@ private:
 
     float sample_left = 0.0f;
     float sample_right = 0.0f;
-
-    float capacitor_left  = 0.0f;
-    float capacitor_right = 0.0f;
 };
