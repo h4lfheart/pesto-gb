@@ -23,8 +23,8 @@
 
 class Memory;
 
-typedef uint8_t (Memory::*ReadFunc)(uint16_t offset);
-typedef void (Memory::*WriteFunc)(uint16_t offset, uint8_t value);
+typedef uint8_t(Memory::*ReadFunc)(uint16_t offset);
+typedef void(Memory::*WriteFunc)(uint16_t offset, uint8_t value);
 
 struct MemoryMapEntry
 {
@@ -35,6 +35,16 @@ struct MemoryMapEntry
     bool enabled = false;
 };
 
+
+typedef uint8_t(*IOReadFunc)(void* ctx, uint8_t* io, uint16_t offset);
+typedef void(*IOWriteFunc)(void* ctx, uint8_t* io, uint16_t offset, uint8_t);
+
+struct IOHandler {
+    void* ctx  = nullptr;
+    IOReadFunc read = nullptr;
+    IOWriteFunc write = nullptr;
+};
+
 class Memory
 {
 public:
@@ -43,7 +53,28 @@ public:
     void LoadBootRom(char* boot_rom_path);
     void InitializeMemoryMap();
     void RegisterMemoryRegion(uint16_t start, uint16_t end,
-                              ReadFunc read, WriteFunc write_fn);
+                              ReadFunc read, WriteFunc write);
+
+    template <class T>
+    void RegisterIOMemoryRegion(uint8_t start, uint8_t end, T* obj, uint8_t (T::*read)(uint8_t*, uint16_t),
+                                void (T::*write)(uint8_t*, uint16_t, uint8_t))
+    {
+        static uint8_t (T::*inst_read) (uint8_t*, uint16_t) = read;
+        static void (T::*inst_write)(uint8_t*, uint16_t, uint8_t) = write;
+
+        for (uint8_t i = start; i <= end; i++)
+        {
+            io_lut[i] = {
+                .ctx  = obj,
+                .read = [](void* ctx, uint8_t* io, uint16_t off) {
+                    return (static_cast<T*>(ctx)->*inst_read)(io, off);
+                },
+                .write = [](void* ctx, uint8_t* io, uint16_t off, uint8_t val) {
+                    (static_cast<T*>(ctx)->*inst_write)(io, off, val);
+                }
+            };
+        }
+    }
 
     void SetInterruptFlag(uint8_t flag);
 
@@ -51,11 +82,11 @@ public:
     void Write8(uint16_t address, uint8_t value);
 
     uint16_t Read16(uint16_t address);
-
     void Write16(uint16_t address, uint16_t value);
 
     uint8_t ReadIO(uint16_t offset);
     void WriteIO(uint16_t offset, uint8_t value);
+    uint8_t* PtrIO(uint8_t offset) { return &this->io[offset]; }
 
     void AttachCartridge(Cartridge* cart);
 
@@ -98,4 +129,6 @@ private:
     uint8_t boot_rom[GB_BOOT_ROM_SIZE] = {};
 
     std::vector<MemoryMapEntry> memory_map = {};
+
+    IOHandler io_lut[GB_IO_SIZE] = {};
 };

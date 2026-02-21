@@ -40,6 +40,9 @@
 #define APU_MIX_SCALE 0.25f
 #define APU_CHANNEL_COUNT 4
 
+#define APU_REG_START 0x10
+#define APU_REG_END 0x26
+
 #define APU_HIGH_PASS_FACTOR 0.996f
 
 class APU
@@ -57,9 +60,14 @@ public:
 private:
     void TickFrame();
 
+    uint8_t APURead(uint8_t* io, uint16_t offset);
+    void APUWrite(uint8_t* io, uint16_t offset, uint8_t value);
+
     float HighPass(float in, bool dac_enabled, float& capacitor);
 
     Memory* memory = nullptr;
+
+    bool enabled = false;
 
     Channel1* channel1 = nullptr;
     Channel2* channel2 = nullptr;

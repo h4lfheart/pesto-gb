@@ -8,7 +8,11 @@ void BaseChannel::AttachMemory(Memory* mem)
 
 void BaseChannel::TickFrame(uint8_t frame_idx)
 {
-    // no default behavioor
+    // no default behavior
+}
+
+void BaseChannel::Reset()
+{
 }
 
 uint8_t BaseChannel::GetOutput()
@@ -23,5 +27,5 @@ bool BaseChannel::IsEnabled()
 
 bool BaseChannel::IsDACEnabled()
 {
-    return this->is_dac_enabled;
+    return false;
 }

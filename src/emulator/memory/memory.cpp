@@ -73,7 +73,7 @@ uint8_t Memory::Read8(uint16_t address)
     if (entry != nullptr && entry->read_handler != nullptr)
     {
         uint16_t offset = address - entry->addr_start;
-        return (this->*(entry->read_handler))(offset);
+        return (this->*entry->read_handler)(offset);
     }
 
     fprintf(stderr, "Invalid read at address 0x%04X - no handler found\n", address);
@@ -109,7 +109,6 @@ void Memory::Write16(uint16_t address, uint16_t value)
 void Memory::AttachCartridge(Cartridge* cart)
 {
     this->cartridge = cart;
-    this->WriteIO(IO_ADDR_JOYP, 0b00001111);
 }
 
 
@@ -187,13 +186,23 @@ void Memory::WriteInvalid(uint16_t offset, uint8_t value)
 {
 }
 
+
 uint8_t Memory::ReadIO(uint16_t offset)
 {
+    if (io_lut[offset].read)
+        return io_lut[offset].read(io_lut[offset].ctx, this->io, offset);
+
     return this->io[offset];
 }
 
 void Memory::WriteIO(uint16_t offset, uint8_t value)
 {
+    if (io_lut[offset].write)
+    {
+        io_lut[offset].write(io_lut[offset].ctx, this->io, offset, value);
+        return;
+    }
+
     if (offset == IO_ADDR_BOOT && value != 0)
     {
         this->use_boot_rom = false;

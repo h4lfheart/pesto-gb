@@ -26,19 +26,18 @@ class BaseChannel
 {
 public:
     virtual ~BaseChannel() = default;
-    void AttachMemory(Memory* mem);
+    virtual void AttachMemory(Memory* mem);
 
     virtual void Tick() = 0;
     virtual void TickFrame(uint8_t frame_idx);
+    virtual void Reset();
 
     uint8_t GetOutput();
     bool IsEnabled();
-    bool IsDACEnabled();
+    virtual bool IsDACEnabled();
 
-protected:
     uint8_t output = 0;
-    uint8_t is_enabled = false;
-    uint8_t is_dac_enabled = false;
+    bool is_enabled = false;
 
     Memory* memory = nullptr;
 

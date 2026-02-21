@@ -34,16 +34,23 @@ void PPU::Cycle()
         break;
 
     case PPUMode::MODE_DRAW:
-        if (this->dots >= DOTS_DRAW)
         {
-            this->dots = 0;
-            this->RenderScanline();
-            this->SetMode(PPUMode::MODE_HBLANK);
+            const int pixel_col = this->dots - 1;
+            if (pixel_col >= 0 && pixel_col < SCREEN_WIDTH)
+                this->bgp_snapshot[pixel_col] = this->memory->ReadIO(IO_ADDR_BGP);
 
-            uint8_t stat = this->memory->ReadIO(IO_ADDR_STAT);
-            if (stat & STAT_HBLANK_INT)
-                this->memory->SetInterruptFlag(INTERRUPT_STAT);
+            if (this->dots >= DOTS_DRAW)
+            {
+                this->dots = 0;
+                this->RenderScanline();
+                this->SetMode(PPUMode::MODE_HBLANK);
+
+                uint8_t stat = this->memory->ReadIO(IO_ADDR_STAT);
+                if (stat & STAT_HBLANK_INT)
+                    this->memory->SetInterruptFlag(INTERRUPT_STAT);
+            }
         }
+
         break;
 
     case PPUMode::MODE_HBLANK:
@@ -158,7 +165,6 @@ void PPU::RenderBackground()
 
     const uint8_t scy = this->memory->ReadIO(IO_ADDR_SCY);
     const uint8_t scx = this->memory->ReadIO(IO_ADDR_SCX);
-    const uint8_t bgp = this->memory->ReadIO(IO_ADDR_BGP);
 
     const uint16_t tile_map_base = (lcdc & LCDC_BG_TILEMAP) ? 0x9C00 : 0x9800;
     const uint16_t tile_data_base = (lcdc & LCDC_TILE_DATA) ? 0x8000 : 0x9000;
@@ -183,7 +189,7 @@ void PPU::RenderBackground()
 
         const uint8_t bit = 7 - pixel_x;
         const uint8_t palette_idx = ((tile_data_2 >> bit) & 1) << 1 | ((tile_data_1 >> bit) & 1);
-        const uint8_t color_idx = (bgp >> (palette_idx << 1)) & 0b11;
+        const uint8_t color_idx = (bgp_snapshot[x] >> (palette_idx << 1)) & 0b11;
 
         this->scanline_pixels[x] = PPUPixel{color_idx, palette_idx };
     }
@@ -204,8 +210,6 @@ void PPU::RenderWindow()
     const int start_x = wx >= WX_OFFSET ? wx - WX_OFFSET : 0;
     if (start_x >= SCREEN_WIDTH)
         return;
-
-    const uint8_t bgp = this->memory->ReadIO(IO_ADDR_BGP);
 
     const uint16_t tile_map_base = (lcdc & LCDC_WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
     const uint16_t tile_data_base = (lcdc & LCDC_TILE_DATA) ? 0x8000 : 0x9000;
@@ -230,7 +234,7 @@ void PPU::RenderWindow()
 
         const uint8_t bit = 7 - pixel_x;
         const uint8_t palette_idx = ((tile_data_2 >> bit) & 1) << 1 | ((tile_data_1 >> bit) & 1);
-        const uint8_t color_idx = (bgp >> (palette_idx << 1)) & 0b11;
+        const uint8_t color_idx = (bgp_snapshot[x] >> (palette_idx << 1)) & 0b11;
 
         this->scanline_pixels[x] = PPUPixel{color_idx, palette_idx };
     }

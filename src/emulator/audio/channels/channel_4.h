@@ -17,12 +17,19 @@ class Channel4 : public BaseChannel
 public:
     void Tick() override;
     void TickFrame(uint8_t frame_idx) override;
+    void Reset() override;
+    void AttachMemory(Memory* mem) override;
+    bool IsDACEnabled() override;
 
-private:
-    void Enable();
+    void Trigger();
 
     void TickLength();
     void TickEnvelope();
+
+    uint8_t* nr41 = nullptr;
+    uint8_t* nr42 = nullptr;
+    uint8_t* nr43 = nullptr;
+    uint8_t* nr44 = nullptr;
 
     uint8_t volume = 0;
     uint8_t length_timer = 0;
@@ -30,4 +37,6 @@ private:
     uint16_t period_timer = 0;
 
     uint16_t lfsr = CH4_LFSR_DEFAULT;
+
+    bool is_envelope_alive = false;
 };

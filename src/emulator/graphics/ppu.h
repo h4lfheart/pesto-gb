@@ -104,4 +104,6 @@ private:
 
     PPUPixel scanline_pixels[SCREEN_WIDTH] = {};
     std::vector<OAMObject> objects;
+
+    uint8_t bgp_snapshot[SCREEN_WIDTH] = {};
 };

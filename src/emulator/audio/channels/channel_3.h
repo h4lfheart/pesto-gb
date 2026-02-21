@@ -20,11 +20,19 @@ class Channel3 : public BaseChannel
 public:
     void Tick() override;
     void TickFrame(uint8_t frame_idx) override;
+    void Reset() override;
+    void AttachMemory(Memory* mem) override;
+    bool IsDACEnabled() override;
 
-private:
-    void Enable();
+    void Trigger();
 
     void TickLength();
+
+    uint8_t* nr30 = nullptr;
+    uint8_t* nr31 = nullptr;
+    uint8_t* nr32 = nullptr;
+    uint8_t* nr33 = nullptr;
+    uint8_t* nr34 = nullptr;
 
     uint16_t period = 0;
     uint16_t period_timer = 0;
@@ -32,5 +40,5 @@ private:
     uint8_t wave_step = 0;
 
     uint8_t volume = 0;
-    uint8_t length_timer = 0;
+    uint16_t length_timer = 0;
 };

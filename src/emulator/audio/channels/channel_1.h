@@ -17,15 +17,23 @@ class Channel1 : public BaseChannel
 public:
     void Tick() override;
     void TickFrame(uint8_t frame_idx) override;
+    void Reset() override;
+    void AttachMemory(Memory* mem) override;
+    bool IsDACEnabled() override;
 
-private:
-    void Enable();
+    void Trigger();
 
     void TickLength();
     void TickEnvelope();
     void TickSweep();
 
     uint16_t CalculateSweepPeriod();
+
+    uint8_t* nr10 = nullptr;
+    uint8_t* nr11 = nullptr;
+    uint8_t* nr12 = nullptr;
+    uint8_t* nr13 = nullptr;
+    uint8_t* nr14 = nullptr;
 
     uint16_t period = 0;
     uint16_t period_timer = 0;
@@ -38,6 +46,9 @@ private:
     uint8_t envelope_timer = 0;
 
     bool sweep_enable = false;
+    bool sweep_negate_used = false;
     uint8_t sweep_timer = 0;
     uint16_t sweep_period = 0;
+
+    bool is_envelope_alive = false;
 };
