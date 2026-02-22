@@ -17,11 +17,12 @@
 #define HEADER_CGB_ENHANCED_MASK 0b10000000
 #define HEADER_CGB_ONLY_MASK 0b01000000
 
-#define HEADER_TITLE_LENGTH 16
+#define HEADER_CGB_TITLE_LENGTH 11
+#define HEADER_DMG_TITLE_LENGTH 16
 
 struct CartridgeHeader
 {
-    char title[HEADER_TITLE_LENGTH];
+    char title[HEADER_DMG_TITLE_LENGTH];
     uint8_t cartridge_type;
     uint8_t rom_size;
     uint8_t ram_size;
@@ -54,7 +55,7 @@ public:
 private:
     void ReadHeader();
 
-    CartridgeHeader header;
+    CartridgeHeader header = {};
 
     uint8_t* rom_data = nullptr;
     uint8_t* ram = nullptr;

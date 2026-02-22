@@ -65,12 +65,13 @@ void Cartridge::ReadHeader()
     if (this->rom_data == nullptr)
         return;
 
-    memcpy(this->header.title, &this->rom_data[HEADER_TITLE_ADDR], HEADER_TITLE_LENGTH);
+    this->header.has_cgb_support = rom_data[HEADER_CGB_FLAG_ADDR] & HEADER_CGB_ENHANCED_MASK;
+
+    memcpy(this->header.title, &this->rom_data[HEADER_TITLE_ADDR], this->header.has_cgb_support ? HEADER_CGB_TITLE_LENGTH : HEADER_DMG_TITLE_LENGTH);
 
     this->header.cartridge_type = rom_data[HEADER_MBC_ADDR];
     this->header.rom_size = rom_data[HEADER_ROM_SIZE_ADDR];
     this->header.ram_size = rom_data[HEADER_RAM_SIZE_ADDR];
-    this->header.has_cgb_support = rom_data[HEADER_CGB_FLAG_ADDR] & HEADER_CGB_ENHANCED_MASK;
 }
 
 char* Cartridge::GetTitle()

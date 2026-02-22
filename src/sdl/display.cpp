@@ -1,5 +1,6 @@
 #include "display.h"
 #include <cstring>
+#include <string>
 
 Display::Display() : window(nullptr), renderer(nullptr), texture(nullptr) {}
 
@@ -10,13 +11,16 @@ Display::~Display() {
     SDL_Quit();
 }
 
-bool Display::Initialize() {
+bool Display::Initialize(std::string rom_name) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         return false;
     }
 
+    char name_buf[64];
+    snprintf(name_buf, 64, "Pesto GB - %s", rom_name.c_str());
+
     window = SDL_CreateWindow(
-        "Pesto GB",
+        name_buf,
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         WIDTH * SCALE,

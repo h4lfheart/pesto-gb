@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+
 #include <SDL2/SDL.h>
 #include <cstdint>
 
@@ -11,7 +13,7 @@ public:
     Display();
     ~Display();
 
-    bool Initialize();
+    bool Initialize(std::string rom_name);
     void Update(uint16_t* pixels);
     void Clear();
 
