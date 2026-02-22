@@ -9,7 +9,7 @@
 #include "io/input.h"
 #include "timer/timer.h"
 
-typedef std::function<void(uint8_t data[SCREEN_WIDTH * SCREEN_HEIGHT])> DrawFunction;
+typedef std::function<void(uint16_t data[SCREEN_WIDTH * SCREEN_HEIGHT])> DrawFunction;
 typedef std::function<void(float left, float right)> AudioFunction;
 
 class GameBoy
@@ -34,7 +34,7 @@ public:
     AudioFunction OnAudioFunction;
 
 private:
-    Cpu* cpu;
+    CPU* cpu;
     Memory* memory;
     Cartridge* cartridge;
     PPU* ppu;

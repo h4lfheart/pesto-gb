@@ -70,6 +70,7 @@ void Cartridge::ReadHeader()
     this->header.cartridge_type = rom_data[HEADER_MBC_ADDR];
     this->header.rom_size = rom_data[HEADER_ROM_SIZE_ADDR];
     this->header.ram_size = rom_data[HEADER_RAM_SIZE_ADDR];
+    this->header.has_cgb_support = rom_data[HEADER_CGB_FLAG_ADDR] & HEADER_CGB_ENHANCED_MASK;
 }
 
 char* Cartridge::GetTitle()
@@ -145,6 +146,11 @@ uint8_t Cartridge::GetRamBankCount() const
         case 0x05: return 8;
         default: return 0;
     }
+}
+
+bool Cartridge::HasCGBSupport() const
+{
+    return this->header.has_cgb_support;
 }
 
 uint8_t Cartridge::ReadRom(uint16_t address) const

@@ -1,4 +1,6 @@
 #include "memory.h"
+
+#include <algorithm>
 #include <cstdio>
 #include <process.h>
 
@@ -11,14 +13,19 @@ Memory::Memory()
     InitializeMemoryMap();
 }
 
+void Memory::AttachCPU(CPU* cpu)
+{
+    this->cpu = cpu;
+}
+
 void Memory::InitializeMemoryMap()
 {
     RegisterMemoryRegion(0x0000, 0x7FFF, &Memory::ReadCartridgeRom, &Memory::WriteCartridgeRom);
     RegisterMemoryRegion(0x8000, 0x9FFF, &Memory::ReadVRAM, &Memory::WriteVRAM);
     RegisterMemoryRegion(0xA000, 0xBFFF, &Memory::ReadCartridgeRam, &Memory::WriteCartridgeRam);
-    RegisterMemoryRegion(0xC000, 0xCFFF, &Memory::ReadWRAM1, &Memory::WriteWRAM1);
-    RegisterMemoryRegion(0xD000, 0xDFFF, &Memory::ReadWRAM2, &Memory::WriteWRAM2);
-    RegisterMemoryRegion(0xE000, 0xFDFF, &Memory::ReadWRAM1, &Memory::WriteWRAM1); // echo ram
+    RegisterMemoryRegion(0xC000, 0xCFFF, &Memory::ReadWRAM0, &Memory::WriteWRAM0);
+    RegisterMemoryRegion(0xD000, 0xDFFF, &Memory::ReadWRAMBank, &Memory::WriteWRAMBank);
+    RegisterMemoryRegion(0xE000, 0xFDFF, &Memory::ReadWRAM0, &Memory::WriteWRAM0); // echo ram
     RegisterMemoryRegion(0xFE00, 0xFE9F, &Memory::ReadOAM, &Memory::WriteOAM);
     RegisterMemoryRegion(0xFEA0, 0xFEFF, &Memory::ReadInvalid, &Memory::WriteInvalid);
     RegisterMemoryRegion(0xFF00, 0xFF7F, &Memory::ReadIO, &Memory::WriteIO);
@@ -61,10 +68,11 @@ MemoryMapEntry* Memory::MemoryRegion(uint16_t address)
 void Memory::LoadBootRom(char* boot_rom_path)
 {
     FILE *rom = fopen(boot_rom_path, "rb");
-    fread(this->boot_rom, 1, GB_BOOT_ROM_SIZE, rom);
+    size_t bytes_read = fread(this->boot_rom, 1, GB_CGB_BOOT_ROM_SIZE, rom);
     fclose(rom);
 
     this->use_boot_rom = true;
+    this->uses_cgb_bootrom = (bytes_read > GB_DMG_BOOT_ROM_SIZE);
 }
 
 uint8_t Memory::Read8(uint16_t address)
@@ -106,15 +114,24 @@ void Memory::Write16(uint16_t address, uint16_t value)
     Write8(address + 1, value >> 8);
 }
 
+uint8_t Memory::ReadVRAMBank(bool use_extra_bank, uint16_t offset)
+{
+    return use_extra_bank ? this->vram2[offset] : this->vram1[offset];
+}
+
 void Memory::AttachCartridge(Cartridge* cart)
 {
     this->cartridge = cart;
 }
 
+bool Memory::IsCGB() const
+{
+    return this->cartridge->HasCGBSupport() && this->uses_cgb_bootrom;
+}
 
 uint8_t Memory::ReadCartridgeRom(uint16_t offset)
 {
-    if (this->use_boot_rom && offset < 0x100)
+    if (this->use_boot_rom && (( offset < 0x100) || (this->uses_cgb_bootrom && offset >= 0x200 && offset < 0x900)))
     {
         return this->boot_rom[offset];
     }
@@ -137,34 +154,37 @@ void Memory::WriteCartridgeRam(uint16_t offset, uint8_t value)
     this->cartridge->WriteRam(offset, value);
 }
 
-uint8_t Memory::ReadWRAM1(uint16_t offset)
+uint8_t Memory::ReadWRAM0(uint16_t offset)
 {
-    return this->wram1[offset];
+    return this->wram0[offset];
 }
 
-void Memory::WriteWRAM1(uint16_t offset, uint8_t value)
+void Memory::WriteWRAM0(uint16_t offset, uint8_t value)
 {
-    this->wram1[offset] = value;
+    this->wram0[offset] = value;
 }
 
-uint8_t Memory::ReadWRAM2(uint16_t offset)
+uint8_t Memory::ReadWRAMBank(uint16_t offset)
 {
-    return this->wram2[offset];
+    return this->wram_banks[wram_bank - 1][offset];
 }
 
-void Memory::WriteWRAM2(uint16_t offset, uint8_t value)
+void Memory::WriteWRAMBank(uint16_t offset, uint8_t value)
 {
-    this->wram2[offset] = value;
+    this->wram_banks[wram_bank - 1][offset] = value;
 }
 
 uint8_t Memory::ReadVRAM(uint16_t offset)
 {
-    return this->vram[offset];
+    return this->use_extra_vram ? this->vram2[offset] : this->vram1[offset];
 }
 
 void Memory::WriteVRAM(uint16_t offset, uint8_t value)
 {
-    this->vram[offset] = value;
+    if (this->use_extra_vram)
+        this->vram2[offset] = value;
+    else
+        this->vram1[offset] = value;
 }
 
 uint8_t Memory::ReadOAM(uint16_t offset)
@@ -201,6 +221,16 @@ void Memory::WriteIO(uint16_t offset, uint8_t value)
     {
         io_lut[offset].write(io_lut[offset].ctx, this->io, offset, value);
         return;
+    }
+
+    if (offset == IO_ADDR_VBK)
+    {
+        this->use_extra_vram = value & VBK_ENABLE_MASK;
+    }
+
+    if (offset == IO_ADDR_WBK)
+    {
+        this->wram_bank = std::max(1, value & WBK_BANK_MASK);
     }
 
     if (offset == IO_ADDR_BOOT && value != 0)

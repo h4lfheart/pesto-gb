@@ -27,8 +27,7 @@ void Timer::Cycle()
     {
         this->div_cycles = 0;
 
-        // TODO io pointers?
-        this->memory->WriteIO(IO_ADDR_DIV, this->memory->ReadIO(IO_ADDR_DIV) + 1);
+        *this->memory->PtrIO(IO_ADDR_DIV) += 1;
     }
 
     const uint8_t tac = this->memory->ReadIO(IO_ADDR_TAC);

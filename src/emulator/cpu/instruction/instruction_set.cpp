@@ -3,32 +3,32 @@
 #include <future>
 
 // Special
-void nop(Cpu* cpu, InstructionRuntime* instr)
+void nop(CPU* cpu, InstructionRuntime* instr)
 {
 
 }
 
-void halt(Cpu* cpu, InstructionRuntime* instr)
+void halt(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->halt = true;
 }
 
-void stop(Cpu* cpu, InstructionRuntime* instr)
+void stop(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->stop = true;
 }
 
-void di(Cpu* cpu, InstructionRuntime* instr)
+void di(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->ime = false;
 }
 
-void ei(Cpu* cpu, InstructionRuntime* instr)
+void ei(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->ime_pending = true;
 }
 
-void daa(Cpu* cpu, InstructionRuntime* instr)
+void daa(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
 
@@ -55,14 +55,14 @@ void daa(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, c);
 }
 
-void scf(Cpu* cpu, InstructionRuntime* instr)
+void scf(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->reg.SetFlag(FlagType::FLAG_N, 0);
    cpu->reg.SetFlag(FlagType::FLAG_H, 0);
    cpu->reg.SetFlag(FlagType::FLAG_C, 1);
 }
 
-void ccf(Cpu* cpu, InstructionRuntime* instr)
+void ccf(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->reg.SetFlag(FlagType::FLAG_N, 0);
    cpu->reg.SetFlag(FlagType::FLAG_H, 0);
@@ -70,12 +70,12 @@ void ccf(Cpu* cpu, InstructionRuntime* instr)
 }
 
 // Flow Control
-void jp_a16(Cpu* cpu, InstructionRuntime* instr)
+void jp_a16(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->reg.PC = instr->imm.u16;
 }
 
-void jp_c_a16(Cpu* cpu, InstructionRuntime* instr)
+void jp_c_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (cpu->reg.GetFlag(FlagType::FLAG_C))
    {
@@ -84,7 +84,7 @@ void jp_c_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void jp_nc_a16(Cpu* cpu, InstructionRuntime* instr)
+void jp_nc_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (!cpu->reg.GetFlag(FlagType::FLAG_C))
    {
@@ -93,13 +93,13 @@ void jp_nc_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void jp_r16(Cpu* cpu, InstructionRuntime* instr)
+void jp_r16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    cpu->reg.PC = *reg;
 }
 
-void jp_z_a16(Cpu* cpu, InstructionRuntime* instr)
+void jp_z_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (cpu->reg.GetFlag(FlagType::FLAG_Z))
    {
@@ -108,7 +108,7 @@ void jp_z_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void jp_nz_a16(Cpu* cpu, InstructionRuntime* instr)
+void jp_nz_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (!cpu->reg.GetFlag(FlagType::FLAG_Z))
    {
@@ -117,14 +117,14 @@ void jp_nz_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void jr_s8(Cpu* cpu, InstructionRuntime* instr)
+void jr_s8(CPU* cpu, InstructionRuntime* instr)
 {
    const int8_t disp = instr->imm.s8;
 
    cpu->reg.PC += disp;
 }
 
-void jr_z_s8(Cpu* cpu, InstructionRuntime* instr)
+void jr_z_s8(CPU* cpu, InstructionRuntime* instr)
 {
    const int8_t disp = instr->imm.s8;
    if (cpu->reg.GetFlag(FlagType::FLAG_Z))
@@ -134,7 +134,7 @@ void jr_z_s8(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void jr_nz_s8(Cpu* cpu, InstructionRuntime* instr)
+void jr_nz_s8(CPU* cpu, InstructionRuntime* instr)
 {
    const int8_t disp = instr->imm.s8;
    if (!cpu->reg.GetFlag(FlagType::FLAG_Z))
@@ -144,7 +144,7 @@ void jr_nz_s8(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void jr_c_s8(Cpu* cpu, InstructionRuntime* instr)
+void jr_c_s8(CPU* cpu, InstructionRuntime* instr)
 {
    const int8_t disp = instr->imm.s8;
    if (cpu->reg.GetFlag(FlagType::FLAG_C))
@@ -154,7 +154,7 @@ void jr_c_s8(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void jr_nc_s8(Cpu* cpu, InstructionRuntime* instr)
+void jr_nc_s8(CPU* cpu, InstructionRuntime* instr)
 {
    const int8_t disp = instr->imm.s8;
    if (!cpu->reg.GetFlag(FlagType::FLAG_C))
@@ -164,13 +164,13 @@ void jr_nc_s8(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void call_a16(Cpu* cpu, InstructionRuntime* instr)
+void call_a16(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->Push16(cpu->reg.PC);
    cpu->reg.PC = instr->imm.u16;
 }
 
-void call_z_a16(Cpu* cpu, InstructionRuntime* instr)
+void call_z_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (cpu->reg.GetFlag(FlagType::FLAG_Z))
    {
@@ -180,7 +180,7 @@ void call_z_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void call_nz_a16(Cpu* cpu, InstructionRuntime* instr)
+void call_nz_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (!cpu->reg.GetFlag(FlagType::FLAG_Z))
    {
@@ -190,7 +190,7 @@ void call_nz_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void call_c_a16(Cpu* cpu, InstructionRuntime* instr)
+void call_c_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (cpu->reg.GetFlag(FlagType::FLAG_C))
    {
@@ -200,7 +200,7 @@ void call_c_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void call_nc_a16(Cpu* cpu, InstructionRuntime* instr)
+void call_nc_a16(CPU* cpu, InstructionRuntime* instr)
 {
    if (!cpu->reg.GetFlag(FlagType::FLAG_C))
    {
@@ -210,18 +210,18 @@ void call_nc_a16(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void ret(Cpu* cpu, InstructionRuntime* instr)
+void ret(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->reg.PC = cpu->Pop16();
 }
 
-void reti(Cpu* cpu, InstructionRuntime* instr)
+void reti(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->reg.PC = cpu->Pop16();
    cpu->ime = true;
 }
 
-void ret_nc(Cpu* cpu, InstructionRuntime* instr)
+void ret_nc(CPU* cpu, InstructionRuntime* instr)
 {
    if (!cpu->reg.GetFlag(FlagType::FLAG_C))
    {
@@ -230,7 +230,7 @@ void ret_nc(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void ret_z(Cpu* cpu, InstructionRuntime* instr)
+void ret_z(CPU* cpu, InstructionRuntime* instr)
 {
    if (cpu->reg.GetFlag(FlagType::FLAG_Z))
    {
@@ -239,7 +239,7 @@ void ret_z(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void ret_c(Cpu* cpu, InstructionRuntime* instr)
+void ret_c(CPU* cpu, InstructionRuntime* instr)
 {
    if (cpu->reg.GetFlag(FlagType::FLAG_C))
    {
@@ -248,7 +248,7 @@ void ret_c(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void ret_nz(Cpu* cpu, InstructionRuntime* instr)
+void ret_nz(CPU* cpu, InstructionRuntime* instr)
 {
    if (!cpu->reg.GetFlag(FlagType::FLAG_Z))
    {
@@ -257,7 +257,7 @@ void ret_nz(Cpu* cpu, InstructionRuntime* instr)
    }
 }
 
-void rst(Cpu* cpu, InstructionRuntime* instr)
+void rst(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->Push16(cpu->reg.PC);
    cpu->reg.PC = instr->def->param1;
@@ -265,13 +265,13 @@ void rst(Cpu* cpu, InstructionRuntime* instr)
 
 // Stack
 
-void push_r16(Cpu* cpu, InstructionRuntime* instr)
+void push_r16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    cpu->Push16(*reg);
 }
 
-void pop_r16(Cpu* cpu, InstructionRuntime* instr)
+void pop_r16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint16_t value = cpu->Pop16();
@@ -283,7 +283,7 @@ void pop_r16(Cpu* cpu, InstructionRuntime* instr)
 }
 
 // Load
-void ld_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void ld_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -291,7 +291,7 @@ void ld_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    *reg1 = *reg2;
 }
 
-void ld_r16_r16(Cpu* cpu, InstructionRuntime* instr)
+void ld_r16_r16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -299,7 +299,7 @@ void ld_r16_r16(Cpu* cpu, InstructionRuntime* instr)
    *reg1 = *reg2;
 }
 
-void ld_r16_r16_s8(Cpu* cpu, InstructionRuntime* instr)
+void ld_r16_r16_s8(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -316,12 +316,12 @@ void ld_r16_r16_s8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void ld_r16_d16(Cpu* cpu, InstructionRuntime* instr)
+void ld_r16_d16(CPU* cpu, InstructionRuntime* instr)
 {
    cpu->reg.Write16(instr->def->op1, instr->imm.u16);
 }
 
-void ld_m16_r8(Cpu* cpu, InstructionRuntime* instr)
+void ld_m16_r8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -329,14 +329,14 @@ void ld_m16_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->memory->Write8(*reg1, *reg2);
 }
 
-void ld_m16_d8(Cpu* cpu, InstructionRuntime* instr)
+void ld_m16_d8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
 
    cpu->memory->Write8(*reg1, instr->imm.u8);
 }
 
-void ldi_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void ldi_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -346,7 +346,7 @@ void ldi_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    *reg2 += 1;
 }
 
-void ldi_m16_r8(Cpu* cpu, InstructionRuntime* instr)
+void ldi_m16_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -356,7 +356,7 @@ void ldi_m16_r8(Cpu* cpu, InstructionRuntime* instr)
    *reg1 += 1;
 }
 
-void ldd_m16_r8(Cpu* cpu, InstructionRuntime* instr)
+void ldd_m16_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -366,7 +366,7 @@ void ldd_m16_r8(Cpu* cpu, InstructionRuntime* instr)
    *reg1 -= 1;
 }
 
-void ldd_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void ldd_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -376,7 +376,7 @@ void ldd_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    *reg2 -= 1;
 }
 
-void ld_m8_r8(Cpu* cpu, InstructionRuntime* instr)
+void ld_m8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -384,21 +384,21 @@ void ld_m8_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->memory->Write8(0xFF00 | *reg1, *reg2);
 }
 
-void ld_r8_imm8(Cpu* cpu, InstructionRuntime* instr)
+void ld_r8_imm8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
 
    *reg1 = cpu->memory->Read8(0xFF00 | instr->imm.u8);
 }
 
-void ld_r8_imm16(Cpu* cpu, InstructionRuntime* instr)
+void ld_r8_imm16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
    *reg = cpu->memory->Read8(instr->imm.u16);
 }
 
-void ld_r8_m8(Cpu* cpu, InstructionRuntime* instr)
+void ld_r8_m8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -406,7 +406,7 @@ void ld_r8_m8(Cpu* cpu, InstructionRuntime* instr)
    *reg1 = cpu->memory->Read8(0xFF00 | *reg2);
 }
 
-void ld_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void ld_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -415,35 +415,35 @@ void ld_r8_m16(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void ld_imm8_r8(Cpu* cpu, InstructionRuntime* instr)
+void ld_imm8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
    cpu->memory->Write8(0xFF00 | instr->imm.u8, *reg);
 }
 
-void ld_imm16_r8(Cpu* cpu, InstructionRuntime* instr)
+void ld_imm16_r8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
    cpu->memory->Write8(instr->imm.u16, *reg);
 }
 
-void ld_imm16_r16(Cpu* cpu, InstructionRuntime* instr)
+void ld_imm16_r16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
 
    cpu->memory->Write16(instr->imm.u16, *reg);
 }
 
-void ld_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void ld_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
    *reg = instr->imm.u8;
 }
 
 // Math
-void add_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void add_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -461,7 +461,7 @@ void add_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void add_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void add_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t imm = instr->imm.u8;
@@ -480,7 +480,7 @@ void add_r8_d8(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void add_r16_r16(Cpu* cpu, InstructionRuntime* instr)
+void add_r16_r16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg1 = cpu->reg.Reg16(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -497,7 +497,7 @@ void add_r16_r16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void add_r16_s8(Cpu* cpu, InstructionRuntime* instr)
+void add_r16_s8(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
 
@@ -514,7 +514,7 @@ void add_r16_s8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void add_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void add_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -533,7 +533,7 @@ void add_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void adc_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void adc_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -552,7 +552,7 @@ void adc_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_H, half_carry);
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
-void adc_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void adc_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
 
@@ -571,7 +571,7 @@ void adc_r8_d8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void adc_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void adc_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -593,7 +593,7 @@ void adc_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void sub_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void sub_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -610,7 +610,7 @@ void sub_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void sub_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void sub_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t value = instr->imm.u8;
@@ -627,7 +627,7 @@ void sub_r8_d8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void sbc_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void sbc_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -647,7 +647,7 @@ void sbc_r8_r8(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void sbc_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void sbc_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -667,7 +667,7 @@ void sbc_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void sbc_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void sbc_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t value = instr->imm.u8;
@@ -686,7 +686,7 @@ void sbc_r8_d8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void sub_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void sub_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -705,7 +705,7 @@ void sub_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void xor_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void xor_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -717,7 +717,7 @@ void xor_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void xor_r8_r16(Cpu* cpu, InstructionRuntime* instr)
+void xor_r8_r16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -730,7 +730,7 @@ void xor_r8_r16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void xor_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void xor_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t value = instr->imm.u8;
@@ -742,7 +742,7 @@ void xor_r8_d8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void or_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void or_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -754,7 +754,7 @@ void or_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void or_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void or_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t value = instr->imm.u8;
@@ -766,7 +766,7 @@ void or_r8_d8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void or_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void or_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -779,7 +779,7 @@ void or_r8_m16(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void and_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void and_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -791,7 +791,7 @@ void and_r8_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void and_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void and_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
    *reg &= instr->imm.u8;
@@ -802,7 +802,7 @@ void and_r8_d8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void and_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void and_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -816,7 +816,7 @@ void and_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void inc_r8(Cpu* cpu, InstructionRuntime* instr)
+void inc_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
    const uint8_t half_carry = HALF_CARRY_ADD(*reg, 1);
@@ -828,13 +828,13 @@ void inc_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_H, half_carry);
 }
 
-void inc_r16(Cpu* cpu, InstructionRuntime* instr)
+void inc_r16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    *reg += 1;
 }
 
-void inc_m16(Cpu* cpu, InstructionRuntime* instr)
+void inc_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    const uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -848,7 +848,7 @@ void inc_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_H, half_carry);
 }
 
-void dec_r8(Cpu* cpu, InstructionRuntime* instr)
+void dec_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
    const uint8_t half_carry = HALF_CARRY_SUB(*reg, 1);
@@ -860,13 +860,13 @@ void dec_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_H, half_carry);
 }
 
-void dec_r16(Cpu* cpu, InstructionRuntime* instr)
+void dec_r16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    *reg -= 1;
 }
 
-void dec_m16(Cpu* cpu, InstructionRuntime* instr)
+void dec_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    const uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -881,7 +881,7 @@ void dec_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_H, half_carry);
 }
 
-void cp_r8_r8(Cpu* cpu, InstructionRuntime* instr)
+void cp_r8_r8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint8_t* reg2 = cpu->reg.Reg8(instr->def->op2);
@@ -897,7 +897,7 @@ void cp_r8_r8(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void cp_r8_d8(Cpu* cpu, InstructionRuntime* instr)
+void cp_r8_d8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -911,7 +911,7 @@ void cp_r8_d8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void cp_r8_m16(Cpu* cpu, InstructionRuntime* instr)
+void cp_r8_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t* reg1 = cpu->reg.Reg8(instr->def->op1);
    const uint16_t* reg2 = cpu->reg.Reg16(instr->def->op2);
@@ -927,7 +927,7 @@ void cp_r8_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry);
 }
 
-void rla(Cpu* cpu, InstructionRuntime* instr)
+void rla(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
 
@@ -940,7 +940,7 @@ void rla(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void rra(Cpu* cpu, InstructionRuntime* instr)
+void rra(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
 
@@ -953,7 +953,7 @@ void rra(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void rlca(Cpu* cpu, InstructionRuntime* instr)
+void rlca(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
 
@@ -967,7 +967,7 @@ void rlca(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void rrca(Cpu* cpu, InstructionRuntime* instr)
+void rrca(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
 
@@ -980,7 +980,7 @@ void rrca(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void cpl(Cpu* cpu, InstructionRuntime* instr)
+void cpl(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(RegisterType::REG_A);
    *reg = ~(*reg);
@@ -990,7 +990,7 @@ void cpl(Cpu* cpu, InstructionRuntime* instr)
 }
 
 // CB
-void rlc_r8(Cpu* cpu, InstructionRuntime* instr)
+void rlc_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -1003,7 +1003,7 @@ void rlc_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void rlc_m16(Cpu* cpu, InstructionRuntime* instr)
+void rlc_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -1018,7 +1018,7 @@ void rlc_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void rrc_r8(Cpu* cpu, InstructionRuntime* instr)
+void rrc_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -1031,7 +1031,7 @@ void rrc_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void rrc_m16(Cpu* cpu, InstructionRuntime* instr)
+void rrc_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    const uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -1046,7 +1046,7 @@ void rrc_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void bit_imm_r8(Cpu* cpu, InstructionRuntime* instr)
+void bit_imm_r8(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t bit = instr->def->param1;
    const uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
@@ -1056,7 +1056,7 @@ void bit_imm_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_H, 1);
 }
 
-void bit_imm_m16(Cpu* cpu, InstructionRuntime* instr)
+void bit_imm_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint8_t bit = instr->def->param1;
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
@@ -1067,7 +1067,7 @@ void bit_imm_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_H, 1);
 }
 
-void rl_r8(Cpu* cpu, InstructionRuntime* instr)
+void rl_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -1080,7 +1080,7 @@ void rl_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void rl_m16(Cpu* cpu, InstructionRuntime* instr)
+void rl_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -1095,7 +1095,7 @@ void rl_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void rr_r8(Cpu* cpu, InstructionRuntime* instr)
+void rr_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -1110,7 +1110,7 @@ void rr_r8(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void rr_m16(Cpu* cpu, InstructionRuntime* instr)
+void rr_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -1126,7 +1126,7 @@ void rr_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, out_carry_bit);
 }
 
-void sla_r8(Cpu* cpu, InstructionRuntime* instr)
+void sla_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -1139,7 +1139,7 @@ void sla_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void sla_m16(Cpu* cpu, InstructionRuntime* instr)
+void sla_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -1154,7 +1154,7 @@ void sla_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void sra_r8(Cpu* cpu, InstructionRuntime* instr)
+void sra_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -1167,7 +1167,7 @@ void sra_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void sra_m16(Cpu* cpu, InstructionRuntime* instr)
+void sra_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -1182,7 +1182,7 @@ void sra_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void srl_r8(Cpu* cpu, InstructionRuntime* instr)
+void srl_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
 
@@ -1195,7 +1195,7 @@ void srl_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, carry_bit);
 }
 
-void srl_m16(Cpu* cpu, InstructionRuntime* instr)
+void srl_m16(CPU* cpu, InstructionRuntime* instr)
 {
    uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t memory_value = cpu->memory->Read8(*reg);
@@ -1211,7 +1211,7 @@ void srl_m16(Cpu* cpu, InstructionRuntime* instr)
 }
 
 
-void swap_r8(Cpu* cpu, InstructionRuntime* instr)
+void swap_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
    *reg = (*reg & 0b1111) << 4 | (*reg >> 4);
@@ -1222,7 +1222,7 @@ void swap_r8(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void swap_m16(Cpu* cpu, InstructionRuntime* instr)
+void swap_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
 
@@ -1236,13 +1236,13 @@ void swap_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->reg.SetFlag(FlagType::FLAG_C, 0);
 }
 
-void res_bit_r8(Cpu* cpu, InstructionRuntime* instr)
+void res_bit_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
    *reg &= ~(1 << instr->def->param1);
 }
 
-void res_bit_m16(Cpu* cpu, InstructionRuntime* instr)
+void res_bit_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t value = cpu->memory->Read8(*reg);
@@ -1250,13 +1250,13 @@ void res_bit_m16(Cpu* cpu, InstructionRuntime* instr)
    cpu->memory->Write8(*reg, value);
 }
 
-void set_bit_r8(Cpu* cpu, InstructionRuntime* instr)
+void set_bit_r8(CPU* cpu, InstructionRuntime* instr)
 {
    uint8_t* reg = cpu->reg.Reg8(instr->def->op1);
    *reg |= 1 << instr->def->param1;
 }
 
-void set_bit_m16(Cpu* cpu, InstructionRuntime* instr)
+void set_bit_m16(CPU* cpu, InstructionRuntime* instr)
 {
    const uint16_t* reg = cpu->reg.Reg16(instr->def->op1);
    uint8_t value = cpu->memory->Read8(*reg);
@@ -1488,7 +1488,6 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
    new InstructionDef("RST 0", 0xC7, rst, 1, 4, 4, RegisterType::REG_NONE, RegisterType::REG_NONE, 0x00),
    new InstructionDef("RET Z", 0xC8, ret_z, 1, 2, 5),
    new InstructionDef("RET", 0xC9, ret, 1, 4, 4),
-   new InstructionDef("JP Z, a16", 0xCA, jp_z_a16, 3, 3, 4),
    new InstructionDef("JP Z, a16", 0xCA, jp_z_a16, 3, 3, 4),
    new InstructionDef("CALL Z, a16", 0xCC, call_z_a16, 3, 3, 6),
    new InstructionDef("CALL a16", 0xCD, call_a16, 3, 6, 6),

@@ -3,7 +3,7 @@
 #include "instruction_set.h"
 
 
-void InstructionRuntime::Execute(Cpu* cpu)
+void InstructionRuntime::Execute(CPU* cpu)
 {
     this->def->func(cpu, this);
 }

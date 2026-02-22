@@ -28,10 +28,10 @@
 
 #define INTERRUPT_MCYCLES 5
 
-class Cpu
+class CPU
 {
 public:
-    Cpu();
+    CPU();
 
     void AttachMemory(Memory* mem);
     int Cycle();

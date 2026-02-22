@@ -15,7 +15,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    game_boy.OnDraw([&](uint8_t* data)
+    game_boy.OnDraw([&](uint16_t* data)
     {
         display.Update(data);
     });

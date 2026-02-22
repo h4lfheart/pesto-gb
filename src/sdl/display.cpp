@@ -50,11 +50,15 @@ bool Display::Initialize() {
     return true;
 }
 
-void Display::Update(uint8_t* pixels) {
+void Display::Update(uint16_t* pixels) {
     uint32_t framebuffer[WIDTH * HEIGHT] = {};
 
     for (int i = 0; i < WIDTH * HEIGHT; i++) {
-        framebuffer[i] = palette[pixels[i]];
+        uint16_t color = pixels[i];
+        uint8_t r = (color & 0x1F) << 3;
+        uint8_t g = ((color >> 5) & 0x1F) << 3;
+        uint8_t b = ((color >> 10) & 0x1F) << 3;
+        framebuffer[i] =  0xFF << 24 | (r << 16) | (g << 8) | b;
     }
 
     SDL_UpdateTexture(texture, nullptr, framebuffer, WIDTH * sizeof(uint32_t));

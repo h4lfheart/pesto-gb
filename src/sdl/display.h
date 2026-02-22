@@ -12,18 +12,11 @@ public:
     ~Display();
 
     bool Initialize();
-    void Update(uint8_t* pixels);
+    void Update(uint16_t* pixels);
     void Clear();
 
 private:
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
-
-    uint32_t palette[4] = {
-        0xFFF1F7D2,
-        0xFFC5D39B,
-        0xFF7FA06B,
-        0xFF3E5A3C
-    };
 };

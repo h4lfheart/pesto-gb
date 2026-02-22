@@ -3,17 +3,17 @@
 #include "instruction/instruction_def.h"
 #include "instruction/instruction_set.h"
 
-Cpu::Cpu()
+CPU::CPU()
 {
     InstructionSet::Initialize();
 }
 
-void Cpu::AttachMemory(Memory* mem)
+void CPU::AttachMemory(Memory* mem)
 {
     this->memory = mem;
 }
 
-int Cpu::Cycle()
+int CPU::Cycle()
 {
     bool ime_was_pending = this->ime_pending;
 
@@ -60,7 +60,7 @@ int Cpu::Cycle()
     return mcycles;
 }
 
-bool Cpu::TryExecuteInterrupts()
+bool CPU::TryExecuteInterrupts()
 {
     const uint8_t interrupt_flag = this->memory->ReadIO(IO_ADDR_INTERRUPT_FLAG);
     const uint8_t pending = (this->memory->ie & interrupt_flag) & INTERRUPT_MASK;
@@ -90,13 +90,13 @@ bool Cpu::TryExecuteInterrupts()
     return false;
 }
 
-void Cpu::Push16(uint16_t value)
+void CPU::Push16(uint16_t value)
 {
     this->reg.SP -= sizeof(uint16_t);
     this->memory->Write16(this->reg.SP, value);
 }
 
-uint16_t Cpu::Pop16()
+uint16_t CPU::Pop16()
 {
     uint16_t value = this->memory->Read16(this->reg.SP);
     this->reg.SP += sizeof(uint16_t);
@@ -104,7 +104,7 @@ uint16_t Cpu::Pop16()
     return value;
 }
 
-void Cpu::ExecuteInterrupt(uint16_t addr)
+void CPU::ExecuteInterrupt(uint16_t addr)
 {
     Push16(this->reg.PC);
     this->reg.PC = addr;

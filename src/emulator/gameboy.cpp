@@ -4,7 +4,7 @@
 
 GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
 {
-    this->cpu = new Cpu();
+    this->cpu = new CPU();
     this->memory = new Memory();
     this->cartridge = new Cartridge();
     this->ppu = new PPU();
@@ -19,6 +19,7 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
         this->memory->LoadBootRom(boot_rom_path);
 
     this->memory->AttachCartridge(this->cartridge);
+    this->memory->AttachCPU(this->cpu);
 
     this->cpu->AttachMemory(this->memory);
     this->ppu->AttachMemory(this->memory);

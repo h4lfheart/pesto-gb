@@ -3,7 +3,7 @@
 #include "../cpu.h"
 
 struct InstructionRuntime;
-typedef void(*InstructionFunc)(Cpu* cpu, InstructionRuntime* instruction);
+typedef void(*InstructionFunc)(CPU* cpu, InstructionRuntime* instruction);
 
 struct InstructionDef
 {
@@ -37,7 +37,7 @@ struct InstructionRuntime
 
     uint8_t cycles;
 
-    void Execute(Cpu* cpu);
+    void Execute(CPU* cpu);
 
     static InstructionRuntime* From(Memory* memory, uint16_t address);
 };
