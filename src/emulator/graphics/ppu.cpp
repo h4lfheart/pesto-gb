@@ -183,6 +183,13 @@ void PPU::PPUWrite(uint8_t* io, uint16_t offset, uint8_t value)
 
         if ((value & HDMA5_TYPE_MASK) == 0)
         {
+            if (this->is_hmda_active)
+            {
+                this->is_hmda_active = false;
+                io[IO_ADDR_HDMA5] = HDMA_TRANSFER_COMPLETE;
+                return;
+            }
+
             // general purpose dma
             for (uint16_t i = 0; i < len; i++)
                 this->memory->WriteVRAM(dst + i, this->memory->Read8(src + i));
@@ -191,7 +198,6 @@ void PPU::PPUWrite(uint8_t* io, uint16_t offset, uint8_t value)
         }
         else
         {
-            // hblank dma
             this->hdma_src = src;
             this->hdma_dst = dst;
             this->hdma_bytes_left = len;
@@ -242,9 +248,9 @@ void PPU::RenderScanline()
 {
     memset(this->scanline_pixels, 0, sizeof(PPUPixel) * SCREEN_WIDTH);
 
-    this->RenderBackground();
-    this->RenderWindow();
-    this->RenderObjects();
+    RenderBackground();
+    RenderWindow();
+    RenderObjects();
 
     for (uint8_t pixel_idx = 0; pixel_idx < SCREEN_WIDTH; pixel_idx++)
         this->framebuffer[this->scanline * SCREEN_WIDTH + pixel_idx] = this->scanline_pixels[pixel_idx].color;
@@ -254,7 +260,7 @@ void PPU::RenderBackground()
 {
     const uint8_t lcdc = this->memory->ReadIO(IO_ADDR_LCDC);
 
-    if ((lcdc & LCDC_BG_ENABLE) == 0)
+    if ((lcdc & LCDC_BG_ENABLE) == 0 && !this->memory->IsCGB())
         return;
 
     const uint8_t scy = this->memory->ReadIO(IO_ADDR_SCY);
@@ -275,11 +281,12 @@ void PPU::RenderBackground()
 
         const uint16_t tile_map_offset = (tile_map_base) + (tile_y * 32) + tile_x;
         const uint8_t tile_index = this->memory->ReadVRAMBank(false, tile_map_offset);
-        const uint8_t tile_attr  = this->memory->ReadVRAMBank(true,  tile_map_offset);
+        const uint8_t tile_attr = this->memory->ReadVRAMBank(true,  tile_map_offset);
 
         const bool use_extra_vram = tile_attr & OBJ_BANK_MASK;
         const bool flip_x = tile_attr & OBJ_FLIP_X_MASK;
         const bool flip_y = tile_attr & OBJ_FLIP_Y_MASK;
+        bool has_background_priority = tile_attr & OBJ_PRIORITY_MASK;
         const uint8_t cgb_palette = tile_attr & OBJ_CGB_PALETTE_MASK;
 
         const uint8_t real_pixel_y = flip_y ? (7 - pixel_y) : pixel_y;
@@ -304,14 +311,15 @@ void PPU::RenderBackground()
             rgb555 = palette[palette_idx];
         }
 
-        this->scanline_pixels[x] = PPUPixel{rgb555, color_idx };
+        this->scanline_pixels[x] = PPUPixel{rgb555, color_idx, has_background_priority };
     }
 }
 
 void PPU::RenderWindow()
 {
     const uint8_t lcdc = this->memory->ReadIO(IO_ADDR_LCDC);
-    if (!(lcdc & LCDC_WINDOW_ENABLE) || !(lcdc & LCDC_BG_ENABLE))
+
+    if (!(lcdc & LCDC_WINDOW_ENABLE) || (!(lcdc & LCDC_BG_ENABLE) && !this->memory->IsCGB()))
         return;
 
     const uint8_t wy = this->memory->ReadIO(IO_ADDR_WY);
@@ -337,7 +345,6 @@ void PPU::RenderWindow()
         const uint8_t tile_x = px / 8;
         const uint8_t pixel_x = px % 8;
 
-
         const uint16_t tile_map_offset = (tile_map_base) + (tile_y * 32) + tile_x;
         const uint8_t tile_index = this->memory->ReadVRAMBank(false, tile_map_offset);
         const uint8_t tile_attr  = this->memory->ReadVRAMBank(true,  tile_map_offset);
@@ -346,6 +353,7 @@ void PPU::RenderWindow()
         const bool flip_x = tile_attr & OBJ_FLIP_X_MASK;
         const bool flip_y = tile_attr & OBJ_FLIP_Y_MASK;
         const uint8_t cgb_palette = tile_attr & OBJ_CGB_PALETTE_MASK;
+        bool has_background_priority = tile_attr & OBJ_PRIORITY_MASK;
 
         const uint8_t real_pixel_y = flip_y ? (7 - pixel_y) : pixel_y;
         const uint8_t real_pixel_x = flip_x ? pixel_x : (7 - pixel_x);
@@ -369,7 +377,7 @@ void PPU::RenderWindow()
             rgb555 = palette[palette_idx];
         }
 
-        this->scanline_pixels[x] = PPUPixel{rgb555, color_idx };
+        this->scanline_pixels[x] = PPUPixel{rgb555, color_idx, has_background_priority };
     }
 
     this->window_line++;
@@ -407,11 +415,12 @@ void PPU::ScanOAM()
         }
     }
 
-    std::ranges::sort(this->objects, [](const OAMObject& a, const OAMObject& b) {
-       if (a.x != b.x)
-           return a.x < b.x;
-       return a.oam_index < b.oam_index;
-   });
+    const bool cgb_priority = this->memory->IsCGB() && (this->memory->ReadIO(IO_ADDR_OPRI) & OPRI_DMG_MODE_MASK) == 0;
+    std::ranges::sort(this->objects, [cgb_priority](const OAMObject& a, const OAMObject& b) {
+        if (!cgb_priority && a.x != b.x)
+            return a.x < b.x;
+        return a.oam_index < b.oam_index;
+    });
 
     if (this->objects.size() > 10)
         this->objects.resize(10);
@@ -465,9 +474,19 @@ void PPU::RenderObjects()
             if (color_idx == 0) // transparent
                 continue;
 
-            // TODO add proper cgb priority
-            if (has_priority && this->scanline_pixels[screen_x].priority_idx != 0)
-                continue;
+            if (this->memory->IsCGB())
+            {
+                if (lcdc & LCDC_BG_ENABLE)
+                {
+                    if ((this->scanline_pixels[screen_x].has_background_priority || has_priority) && this->scanline_pixels[screen_x].priority_idx != 0)
+                        continue;
+                }
+            }
+            else
+            {
+                if (has_priority && this->scanline_pixels[screen_x].priority_idx != 0)
+                    continue;
+            }
 
             uint16_t rgb555;
             if (this->memory->IsCGB())

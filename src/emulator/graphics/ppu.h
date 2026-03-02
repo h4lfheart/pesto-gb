@@ -24,6 +24,7 @@
 #define IO_ADDR_OBP1 0x49
 #define IO_ADDR_WY 0x4A
 #define IO_ADDR_WX 0x4B
+#define IO_ADDR_OPRI 0x6C
 
 #define IO_ADDR_BCPS 0x68
 #define IO_ADDR_BCPD 0x69
@@ -35,6 +36,8 @@
 #define IO_ADDR_HDMA3 0x53
 #define IO_ADDR_HDMA4 0x54
 #define IO_ADDR_HDMA5 0x55
+
+#define OPRI_DMG_MODE_MASK 0b00000001
 
 #define HDMA5_TYPE_MASK 0b10000000
 #define HDMA_TRANSFER_COMPLETE 0xFF
@@ -94,6 +97,7 @@ struct PPUPixel
 {
     uint16_t color;
     uint8_t priority_idx;
+    bool has_background_priority;
 };
 
 class PPU
