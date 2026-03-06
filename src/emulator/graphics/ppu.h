@@ -103,7 +103,7 @@ struct PPUPixel
 class PPU
 {
 public:
-    void Cycle();
+    void Cycle(uint8_t cycles);
     void AttachMemory(Memory* mem);
 
     uint16_t framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] = {};
@@ -132,7 +132,9 @@ private:
     uint8_t window_line = 0;
 
     PPUPixel scanline_pixels[SCREEN_WIDTH] = {};
-    std::vector<OAMObject> objects;
+
+    OAMObject objects[10] = {};
+    uint8_t object_count = 0;
 
     uint8_t bgp_snapshot[SCREEN_WIDTH] = {};
 
@@ -150,4 +152,19 @@ private:
         0x368F,
         0x1D67
     };
+
+    bool is_cgb = false;
+
+    uint8_t* LCDC = nullptr;
+    uint8_t* STAT = nullptr;
+    uint8_t* SCY = nullptr;
+    uint8_t* SCX = nullptr;
+    uint8_t* LY = nullptr;
+    uint8_t* LYC = nullptr;
+    uint8_t* BGP = nullptr;
+    uint8_t* OBP0 = nullptr;
+    uint8_t* OBP1 = nullptr;
+    uint8_t* WY = nullptr;
+    uint8_t* WX = nullptr;
+    uint8_t* OPRI = nullptr;
 };

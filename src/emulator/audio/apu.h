@@ -48,7 +48,7 @@ class APU
 public:
     APU();
 
-    void Cycle();
+    void Cycle(uint8_t cycles);
     void AttachMemory(Memory* mem);
     void GetSamples(float& left, float& right) const;
 
@@ -75,4 +75,7 @@ private:
 
     float sample_left = 0.0f;
     float sample_right = 0.0f;
+
+    uint8_t* NR50 = nullptr;
+    uint8_t* NR51 = nullptr;
 };

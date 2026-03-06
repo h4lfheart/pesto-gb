@@ -34,7 +34,7 @@ void Memory::InitializeMemoryMap()
 }
 
 void Memory::RegisterMemoryRegion(uint16_t start, uint16_t end,
-                                   ReadFunc read, WriteFunc write)
+                                  ReadFunc read, WriteFunc write)
 {
     memory_map.push_back({
         .addr_start = start,
@@ -47,8 +47,7 @@ void Memory::RegisterMemoryRegion(uint16_t start, uint16_t end,
 
 void Memory::SetInterruptFlag(uint8_t flag)
 {
-    const uint8_t interrupt_flag = this->ReadIO(IO_ADDR_INTERRUPT_FLAG);
-    this->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag | flag);
+    this->io[IO_ADDR_INTERRUPT_FLAG] |= flag;
 }
 
 MemoryMapEntry* Memory::MemoryRegion(uint16_t address)
@@ -67,7 +66,7 @@ MemoryMapEntry* Memory::MemoryRegion(uint16_t address)
 
 void Memory::LoadBootRom(char* boot_rom_path)
 {
-    FILE *rom = fopen(boot_rom_path, "rb");
+    FILE* rom = fopen(boot_rom_path, "rb");
     size_t bytes_read = fread(this->boot_rom, 1, GB_CGB_BOOT_ROM_SIZE, rom);
     fclose(rom);
 
@@ -131,7 +130,7 @@ bool Memory::IsCGB() const
 
 uint8_t Memory::ReadCartridgeRom(uint16_t offset)
 {
-    if (this->use_boot_rom && (( offset < 0x100) || (this->uses_cgb_bootrom && offset >= 0x200 && offset < 0x900)))
+    if (this->use_boot_rom && ((offset < 0x100) || (this->uses_cgb_bootrom && offset >= 0x200 && offset < 0x900)))
     {
         return this->boot_rom[offset];
     }
@@ -267,4 +266,9 @@ uint8_t Memory::ReadIE(uint16_t offset)
 void Memory::WriteIE(uint16_t offset, uint8_t value)
 {
     this->ie = value;
+}
+
+uint8_t* Memory::OAMPtr()
+{
+    return oam;
 }

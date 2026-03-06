@@ -32,8 +32,8 @@
 class Memory;
 class CPU;
 
-typedef uint8_t(Memory::*ReadFunc)(uint16_t offset);
-typedef void(Memory::*WriteFunc)(uint16_t offset, uint8_t value);
+typedef uint8_t (Memory::*ReadFunc)(uint16_t offset);
+typedef void (Memory::*WriteFunc)(uint16_t offset, uint8_t value);
 
 struct MemoryMapEntry
 {
@@ -45,10 +45,11 @@ struct MemoryMapEntry
 };
 
 
-typedef uint8_t(*IOReadFunc)(void* ctx, uint8_t* io, uint16_t offset);
-typedef void(*IOWriteFunc)(void* ctx, uint8_t* io, uint16_t offset, uint8_t);
+typedef uint8_t (*IOReadFunc)(void* ctx, uint8_t* io, uint16_t offset);
+typedef void (*IOWriteFunc)(void* ctx, uint8_t* io, uint16_t offset, uint8_t);
 
-struct IOHandler {
+struct IOHandler
+{
     void* ctx = nullptr;
     IOReadFunc read = nullptr;
     IOWriteFunc write = nullptr;
@@ -71,17 +72,19 @@ public:
     void RegisterIOMemoryRegion(uint8_t start, uint8_t end, T* obj, uint8_t (T::*read)(uint8_t*, uint16_t),
                                 void (T::*write)(uint8_t*, uint16_t, uint8_t))
     {
-        static uint8_t (T::*inst_read) (uint8_t*, uint16_t) = read;
+        static uint8_t (T::*inst_read)(uint8_t*, uint16_t) = read;
         static void (T::*inst_write)(uint8_t*, uint16_t, uint8_t) = write;
 
         for (uint8_t i = start; i <= end; i++)
         {
             io_lut[i] = {
-                .ctx  = obj,
-                .read = [](void* ctx, uint8_t* io, uint16_t off) {
+                .ctx = obj,
+                .read = [](void* ctx, uint8_t* io, uint16_t off)
+                {
                     return (static_cast<T*>(ctx)->*inst_read)(io, off);
                 },
-                .write = [](void* ctx, uint8_t* io, uint16_t off, uint8_t val) {
+                .write = [](void* ctx, uint8_t* io, uint16_t off, uint8_t val)
+                {
                     (static_cast<T*>(ctx)->*inst_write)(io, off, val);
                 }
             };
@@ -129,6 +132,8 @@ public:
     void WriteInvalid(uint16_t offset, uint8_t value);
     void WriteHRAM(uint16_t offset, uint8_t value);
     void WriteIE(uint16_t offset, uint8_t value);
+
+    uint8_t* OAMPtr();
 
 private:
     MemoryMapEntry* MemoryRegion(uint16_t address);

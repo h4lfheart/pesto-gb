@@ -8,7 +8,7 @@ void InstructionRuntime::Execute(CPU* cpu)
     this->def->func(cpu, this);
 }
 
-InstructionRuntime* InstructionRuntime::From(Memory* memory, uint16_t address)
+bool InstructionRuntime::From(Memory* memory, uint16_t address, InstructionRuntime* runtime)
 {
     uint16_t cur_address = address;
     uint8_t op = memory->Read8(cur_address++);
@@ -19,10 +19,11 @@ InstructionRuntime* InstructionRuntime::From(Memory* memory, uint16_t address)
 
     const InstructionDef* instruction = is_prefix ? InstructionSet::GetPrefixed(op) : InstructionSet::Get(op);
     if (instruction == nullptr)
-        return nullptr;
+        return false;
 
-    auto* runtime = new InstructionRuntime{
+    *runtime = {
         .def = instruction,
+        .imm = {},
         .cycles = instruction->main_cycles
     };
 
@@ -38,5 +39,5 @@ InstructionRuntime* InstructionRuntime::From(Memory* memory, uint16_t address)
         }
     }
 
-    return runtime;
+    return true;
 }

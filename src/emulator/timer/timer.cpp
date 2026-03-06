@@ -2,7 +2,7 @@
 
 #include "../cpu/cpu.h"
 
-static uint16_t clock_rates[4] =
+static constexpr uint16_t clock_rates[4] =
 {
     1024,
     16,
@@ -10,48 +10,47 @@ static uint16_t clock_rates[4] =
     256
 };
 
-Timer::Timer()
-{
-}
-
 void Timer::AttachMemory(Memory* mem)
 {
     this->memory = mem;
+
+    DIV = mem->PtrIO(IO_ADDR_DIV);
+    TIMA = mem->PtrIO(IO_ADDR_TIMA);
+    TMA = mem->PtrIO(IO_ADDR_TMA);
+    TAC = mem->PtrIO(IO_ADDR_TAC);
 }
 
-void Timer::Cycle()
+void Timer::Cycle(uint8_t cycles)
 {
-    this->div_cycles++;
-
-    if (this->div_cycles >= DIV_CYCLES_PER_TICK)
+    this->div_cycles += cycles;
+    if (this->div_cycles >= DIV_CLOCK_RATE)
     {
-        this->div_cycles = 0;
-
-        *this->memory->PtrIO(IO_ADDR_DIV) += 1;
+        const uint16_t div_ticks = this->div_cycles / DIV_CLOCK_RATE;
+        this->div_cycles -= div_ticks * DIV_CLOCK_RATE;
+        *DIV += div_ticks;
     }
 
-    const uint8_t tac = this->memory->ReadIO(IO_ADDR_TAC);
-    if (tac & TAC_ENABLE)
+    if ((*TAC & TAC_ENABLE) == 0)
+        return;
+
+    const uint16_t tima_clock_rate = clock_rates[*TAC & TAC_SELECT_MASK];
+
+    this->tima_cycles += cycles;
+    if (this->tima_cycles >= tima_clock_rate)
     {
-        this->tima_cycles++;
+        const uint16_t tima_ticks = this->tima_cycles / tima_clock_rate;
 
-        const uint8_t mode = tac & TAC_SELECT_MASK;
+        this->tima_cycles -= tima_ticks * tima_clock_rate;
 
-        if (this->tima_cycles >= clock_rates[mode])
+        const uint16_t tima_new = *TIMA + tima_ticks;
+        if (tima_new > 0xFF)
         {
-            this->tima_cycles = 0;
-
-            const uint8_t tima = this->memory->ReadIO(IO_ADDR_TIMA);
-            if (tima == 0xFF)
-            {
-                this->memory->WriteIO(IO_ADDR_TIMA,this->memory->ReadIO(IO_ADDR_TMA));
-
-                this->memory->SetInterruptFlag(INTERRUPT_TIMER);
-            }
-            else
-            {
-                this->memory->WriteIO(IO_ADDR_TIMA, tima + 1);
-            }
+            *TIMA = *TMA;
+            this->memory->SetInterruptFlag(INTERRUPT_TIMER);
+        }
+        else
+        {
+            *TIMA = static_cast<uint8_t>(tima_new);
         }
     }
 }

@@ -11,17 +11,18 @@ CPU::CPU()
 void CPU::AttachMemory(Memory* mem)
 {
     this->memory = mem;
+
+    IF = memory->PtrIO(IO_ADDR_INTERRUPT_FLAG);
+    IE = &memory->ie;
 }
 
 int CPU::Cycle()
 {
-    bool ime_was_pending = this->ime_pending;
+    const bool ime_was_pending = this->ime_pending;
 
     if (this->halt)
     {
-        const uint8_t interrupt_flag = this->memory->ReadIO(IO_ADDR_INTERRUPT_FLAG);
-        const uint8_t pending = (this->memory->ie & interrupt_flag) & INTERRUPT_MASK;
-        if (pending)
+        if (*IE & *IF & INTERRUPT_MASK)
             this->halt = false;
     }
 
@@ -37,17 +38,18 @@ int CPU::Cycle()
     }
     else
     {
-        InstructionRuntime* instr = InstructionRuntime::From(this->memory, this->reg.PC);
-        if (instr == nullptr)
+        InstructionRuntime instr = {};
+        if (!InstructionRuntime::From(this->memory, this->reg.PC, &instr))
         {
             uint8_t op = this->memory->Read8(this->reg.PC);
-            fprintf(stderr, "Unknown instruction at 0x%.4X: 0x%.2X\n", this->reg.PC, op == 0xCB? (op << 8) | this->memory->Read8(this->reg.PC + 1): op);
+            fprintf(stderr, "Unknown instruction at 0x%.4X: 0x%.2X\n", this->reg.PC,
+                    op == 0xCB ? (op << 8) | this->memory->Read8(this->reg.PC + 1) : op);
             exit(1);
         }
 
-        this->reg.PC += instr->def->size;
-        instr->Execute(this);
-        mcycles = instr->cycles;
+        this->reg.PC += instr.def->size;
+        instr.Execute(this);
+        mcycles = instr.cycles;
     }
 
     if (ime_was_pending)
@@ -62,26 +64,29 @@ int CPU::Cycle()
 
 bool CPU::TryExecuteInterrupts()
 {
-    const uint8_t interrupt_flag = this->memory->ReadIO(IO_ADDR_INTERRUPT_FLAG);
-    const uint8_t pending = (this->memory->ie & interrupt_flag) & INTERRUPT_MASK;
+    const uint8_t pending = *IE & *IF & INTERRUPT_MASK;
     if (pending == 0)
         return false;
 
     this->ime = false;
 
-    struct { uint8_t mask; uint16_t addr; } handlers[] = {
-        { INTERRUPT_VBLANK, INT_ADDR_VBLANK   },
-        { INTERRUPT_STAT,   INT_ADDR_LCD_STAT },
-        { INTERRUPT_TIMER,  INT_ADDR_TIMER    },
-        { INTERRUPT_SERIAL, INT_ADDR_SERIAL   },
-        { INTERRUPT_JOYPAD, INT_ADDR_JOYPAD   },
-    };
+    struct
+    {
+        uint8_t mask;
+        uint16_t addr;
+    } handlers[] = {
+            {INTERRUPT_VBLANK, INT_ADDR_VBLANK},
+            {INTERRUPT_STAT, INT_ADDR_LCD_STAT},
+            {INTERRUPT_TIMER, INT_ADDR_TIMER},
+            {INTERRUPT_SERIAL, INT_ADDR_SERIAL},
+            {INTERRUPT_JOYPAD, INT_ADDR_JOYPAD},
+        };
 
     for (const auto& [mask, addr] : handlers)
     {
         if (pending & mask)
         {
-            this->memory->WriteIO(IO_ADDR_INTERRUPT_FLAG, interrupt_flag & ~mask);
+            *IF &= ~mask;
             ExecuteInterrupt(addr);
             return true;
         }

@@ -49,6 +49,10 @@ public:
     bool ime_pending = false;
 
     Memory* memory = nullptr;
+
 private:
     void ExecuteInterrupt(uint16_t addr);
+
+    uint8_t* IF = nullptr;
+    uint8_t* IE = nullptr;
 };

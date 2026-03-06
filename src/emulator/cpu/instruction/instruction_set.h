@@ -13,7 +13,4 @@ public:
 private:
     static InstructionDef* instructions[INSTRUCTION_SET_SIZE];
     static InstructionDef* prefix_instructions[INSTRUCTION_SET_SIZE];
-
-    static int instruction_mappings[INSTRUCTION_SET_SIZE];
-    static int prefix_instruction_mappings[INSTRUCTION_SET_SIZE];
 };

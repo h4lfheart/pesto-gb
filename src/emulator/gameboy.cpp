@@ -1,6 +1,12 @@
 #include "gameboy.h"
 #include <chrono>
 #include <thread>
+#include <cstdio>
+
+static int64_t now_ns()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
 {
@@ -33,44 +39,25 @@ GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
     this->is_running = true;
 }
 
-uint64_t get_time()
-{
-    timespec ts{};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000000000 + ts.tv_nsec;
-}
-
 void GameBoy::Run()
 {
-    uint64_t last_time = get_time();
-    uint64_t current_time = 0;
+    const int64_t FRAME_BUDGET_NS = (int64_t)(1'000'000'000.0 / FRAMES_PER_SECOND);
+    int64_t frame_start = now_ns();
 
-    uint64_t frame_interval = FRAME_INTERVAL;
-    //frame_interval = 0;
     while (this->is_running)
     {
-        current_time = get_time();
+        int frame_mcycles = (int)((CLOCK_RATE / T_CYCLES_PER_M_CYCLE) / FRAMES_PER_SECOND);
 
-        if (current_time - last_time < frame_interval)
-            continue;
-
-        last_time = current_time;
-
-        int frame_mcycles = (CLOCK_RATE / T_CYCLES_PER_M_CYCLE) / FRAMES_PER_SECOND;
         while (frame_mcycles > 0)
         {
             const int mcycles = this->cpu->Cycle();
             const int tcycles = mcycles * T_CYCLES_PER_M_CYCLE;
+
             frame_mcycles -= mcycles;
 
-            for (int t = 0; t < tcycles; t++)
-            {
-                this->ppu->Cycle();
-                this->apu->Cycle();
-                this->timer->Cycle();
-            }
-
-            this->input->Cycle();
+            this->ppu->Cycle(tcycles);
+            this->apu->Cycle(tcycles);
+            this->timer->Cycle(tcycles);
 
             if (this->ppu->ready_for_draw)
             {
@@ -86,45 +73,22 @@ void GameBoy::Run()
                 this->apu->ready_for_samples = false;
             }
         }
+
+        const int64_t next_frame = frame_start + FRAME_BUDGET_NS;
+        const int64_t sleep_ns = next_frame - now_ns();
+        if (sleep_ns > 0)
+            std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_ns));
+
+        frame_start = next_frame;
     }
 }
 
-void GameBoy::Stop()
-{
-    this->is_running = false;
-}
+void GameBoy::Stop() { this->is_running = false; }
+bool GameBoy::IsRunning() { return this->is_running; }
 
-bool GameBoy::IsRunning()
-{
-    return this->is_running;
-}
-
-void GameBoy::PressButton(InputButton button)
-{
-    this->input->PressButton(button);
-}
-
-void GameBoy::ReleaseButton(InputButton button)
-{
-    this->input->ReleaseButton(button);
-}
-
-void GameBoy::OnDraw(const DrawFunction onDraw)
-{
-    this->OnDrawFunction = onDraw;
-}
-
-void GameBoy::OnAudio(const AudioFunction onAudio)
-{
-    this->OnAudioFunction = onAudio;
-}
-
-void GameBoy::ReadSave(const char* path)
-{
-    this->cartridge->ReadSave(path);
-}
-
-void GameBoy::WriteSave(const char* path)
-{
-    this->cartridge->WriteSave(path);
-}
+void GameBoy::PressButton(InputButton button) { this->input->PressButton(button); }
+void GameBoy::ReleaseButton(InputButton button) { this->input->ReleaseButton(button); }
+void GameBoy::OnDraw(const DrawFunction onDraw) { this->OnDrawFunction = onDraw; }
+void GameBoy::OnAudio(const AudioFunction onAudio) { this->OnAudioFunction = onAudio; }
+void GameBoy::ReadSave(const char* path) { this->cartridge->ReadSave(path); }
+void GameBoy::WriteSave(const char* path) { this->cartridge->WriteSave(path); }

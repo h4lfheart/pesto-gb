@@ -1,4 +1,5 @@
 #pragma once
+
 #include <unordered_map>
 
 #include "../memory/memory.h"
@@ -15,7 +16,6 @@
 #define JOYP_BIT_P12 0b00000100
 #define JOYP_BIT_P13 0b00001000
 
-
 #define JOYP_BIT_RIGHT JOYP_BIT_P10
 #define JOYP_BIT_LEFT JOYP_BIT_P11
 #define JOYP_BIT_UP JOYP_BIT_P12
@@ -28,7 +28,6 @@
 
 enum class InputButton
 {
-    BUTTON_NONE,
     BUTTON_A,
     BUTTON_B,
     BUTTON_START,
@@ -44,15 +43,20 @@ class Input
 public:
     void AttachMemory(Memory* mem);
 
-    void Cycle();
-
     void PressButton(InputButton button);
+
     void ReleaseButton(InputButton button);
 
-private:
-    Memory* memory = nullptr;
-    std::unordered_set<InputButton> pressed_buttons;
+    void WriteJOYP(uint8_t* io, uint16_t offset, uint8_t value);
 
-    static const std::unordered_map<InputButton, uint8_t> button_bits;
-    static const std::unordered_map<InputButton, uint8_t> dpad_bits;
+    uint8_t ReadJOYP(uint8_t* io, uint16_t offset);
+
+private:
+    void Update();
+
+    Memory* memory = nullptr;
+    uint8_t* JOYP = nullptr;
+
+    uint8_t button_state = 0;
+    uint8_t dpad_state = 0;
 };

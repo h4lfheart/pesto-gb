@@ -5,63 +5,108 @@
 
 #include "../cpu/cpu.h"
 
-const std::unordered_map<InputButton, uint8_t> Input::button_bits = {
-    {InputButton::BUTTON_A,      JOYP_BIT_A},
-    {InputButton::BUTTON_B,      JOYP_BIT_B},
-    {InputButton::BUTTON_SELECT, JOYP_BIT_SELECT},
-    {InputButton::BUTTON_START,  JOYP_BIT_START}
-};
-
-const std::unordered_map<InputButton, uint8_t> Input::dpad_bits = {
-    {InputButton::BUTTON_RIGHT, JOYP_BIT_RIGHT},
-    {InputButton::BUTTON_LEFT,  JOYP_BIT_LEFT},
-    {InputButton::BUTTON_UP,    JOYP_BIT_UP},
-    {InputButton::BUTTON_DOWN,  JOYP_BIT_DOWN}
-};
-
 void Input::AttachMemory(Memory* mem)
 {
     this->memory = mem;
-    this->memory->WriteIO(IO_ADDR_JOYP, 0b00001111);
+
+    mem->RegisterIOMemoryRegion(IO_ADDR_JOYP, IO_ADDR_JOYP, this, &Input::ReadJOYP, &Input::WriteJOYP);
+
+    this->JOYP = mem->PtrIO(IO_ADDR_JOYP);
+    *JOYP = 0b00001111;
 }
 
 void Input::PressButton(InputButton button)
 {
-    this->pressed_buttons.insert(button);
+    switch (button)
+    {
+    case InputButton::BUTTON_A:
+        button_state |= JOYP_BIT_A;
+        break;
+    case InputButton::BUTTON_B:
+        button_state |= JOYP_BIT_B;
+        break;
+    case InputButton::BUTTON_SELECT:
+        button_state |= JOYP_BIT_SELECT;
+        break;
+    case InputButton::BUTTON_START:
+        button_state |= JOYP_BIT_START;
+        break;
+    case InputButton::BUTTON_RIGHT:
+        dpad_state |= JOYP_BIT_RIGHT;
+        break;
+    case InputButton::BUTTON_LEFT:
+        dpad_state |= JOYP_BIT_LEFT;
+        break;
+    case InputButton::BUTTON_UP:
+        dpad_state |= JOYP_BIT_UP;
+        break;
+    case InputButton::BUTTON_DOWN:
+        dpad_state |= JOYP_BIT_DOWN;
+        break;
+    default:
+        break;
+    }
+
+    Update();
 }
 
 void Input::ReleaseButton(InputButton button)
 {
-    this->pressed_buttons.erase(button);
+    switch (button)
+    {
+    case InputButton::BUTTON_A:
+        button_state &= ~JOYP_BIT_A;
+        break;
+    case InputButton::BUTTON_B:
+        button_state &= ~JOYP_BIT_B;
+        break;
+    case InputButton::BUTTON_SELECT:
+        button_state &= ~JOYP_BIT_SELECT;
+        break;
+    case InputButton::BUTTON_START:
+        button_state &= ~JOYP_BIT_START;
+        break;
+    case InputButton::BUTTON_RIGHT:
+        dpad_state &= ~JOYP_BIT_RIGHT;
+        break;
+    case InputButton::BUTTON_LEFT:
+        dpad_state &= ~JOYP_BIT_LEFT;
+        break;
+    case InputButton::BUTTON_UP:
+        dpad_state &= ~JOYP_BIT_UP;
+        break;
+    case InputButton::BUTTON_DOWN:
+        dpad_state &= ~JOYP_BIT_DOWN;
+        break;
+    default:
+        break;
+    }
+
+    Update();
 }
 
-void Input::Cycle()
+uint8_t Input::ReadJOYP(uint8_t* io, uint16_t offset)
 {
-    uint8_t joyp = this->memory->ReadIO(IO_ADDR_JOYP);
-    uint8_t result = 0b00001111;  // All buttons released
+    return *this->JOYP;
+}
 
-    const bool select_buttons = (joyp & JOYP_SELECT_BUTTONS) == 0;
-    const bool select_dpad = (joyp & JOYP_SELECT_DPAD) == 0;
+void Input::WriteJOYP(uint8_t* io, uint16_t offset, uint8_t value)
+{
+    *this->JOYP = (*this->JOYP & ~JOYP_SELECTION_MASK) | (value & JOYP_SELECTION_MASK);
+    Update();
+}
 
-    if (select_buttons)
-    {
-        for (const auto& button : pressed_buttons)
-        {
-            if (auto it = button_bits.find(button); it != button_bits.end())
-                result &= ~it->second;
-        }
-    }
 
-    if (select_dpad)
-    {
-        for (const auto& button : pressed_buttons)
-        {
-            if (auto it = dpad_bits.find(button); it != dpad_bits.end())
-                result &= ~it->second;
-        }
-    }
+void Input::Update()
+{
+    uint8_t result = 0b00001111;
 
-    result |= joyp & JOYP_SELECTION_MASK;
+    if ((*JOYP & JOYP_SELECT_BUTTONS) == 0)
+        result &= ~button_state;
 
-    this->memory->WriteIO(IO_ADDR_JOYP, result);
+    if ((*JOYP & JOYP_SELECT_DPAD) == 0)
+        result &= ~dpad_state;
+
+    result |= *JOYP & JOYP_SELECTION_MASK;
+    *JOYP = result;
 }
