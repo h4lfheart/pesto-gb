@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <process.h>
 
 #include "../cpu/cpu.h"
 #include "../io/input.h"
@@ -10,58 +9,11 @@
 
 Memory::Memory()
 {
-    InitializeMemoryMap();
 }
 
 void Memory::AttachCPU(CPU* cpu)
 {
     this->cpu = cpu;
-}
-
-void Memory::InitializeMemoryMap()
-{
-    RegisterMemoryRegion(0x0000, 0x7FFF, &Memory::ReadCartridgeRom, &Memory::WriteCartridgeRom);
-    RegisterMemoryRegion(0x8000, 0x9FFF, &Memory::ReadVRAM, &Memory::WriteVRAM);
-    RegisterMemoryRegion(0xA000, 0xBFFF, &Memory::ReadCartridgeRam, &Memory::WriteCartridgeRam);
-    RegisterMemoryRegion(0xC000, 0xCFFF, &Memory::ReadWRAM0, &Memory::WriteWRAM0);
-    RegisterMemoryRegion(0xD000, 0xDFFF, &Memory::ReadWRAMBank, &Memory::WriteWRAMBank);
-    RegisterMemoryRegion(0xE000, 0xFDFF, &Memory::ReadWRAM0, &Memory::WriteWRAM0); // echo ram
-    RegisterMemoryRegion(0xFE00, 0xFE9F, &Memory::ReadOAM, &Memory::WriteOAM);
-    RegisterMemoryRegion(0xFEA0, 0xFEFF, &Memory::ReadInvalid, &Memory::WriteInvalid);
-    RegisterMemoryRegion(0xFF00, 0xFF7F, &Memory::ReadIO, &Memory::WriteIO);
-    RegisterMemoryRegion(0xFF80, 0xFFFE, &Memory::ReadHRAM, &Memory::WriteHRAM);
-    RegisterMemoryRegion(0xFFFF, 0xFFFF, &Memory::ReadIE, &Memory::WriteIE);
-}
-
-void Memory::RegisterMemoryRegion(uint16_t start, uint16_t end,
-                                  ReadFunc read, WriteFunc write)
-{
-    memory_map.push_back({
-        .addr_start = start,
-        .addr_end = end,
-        .read_handler = read,
-        .write_handler = write,
-        .enabled = true
-    });
-}
-
-void Memory::SetInterruptFlag(uint8_t flag)
-{
-    this->io[IO_ADDR_INTERRUPT_FLAG] |= flag;
-}
-
-MemoryMapEntry* Memory::MemoryRegion(uint16_t address)
-{
-    for (auto& entry : memory_map)
-    {
-        if (entry.enabled &&
-            address >= entry.addr_start &&
-            address <= entry.addr_end)
-        {
-            return &entry;
-        }
-    }
-    return nullptr;
 }
 
 void Memory::LoadBootRom(char* boot_rom_path)
@@ -74,37 +26,120 @@ void Memory::LoadBootRom(char* boot_rom_path)
     this->uses_cgb_bootrom = (bytes_read > GB_DMG_BOOT_ROM_SIZE);
 }
 
+void Memory::SetInterruptFlag(uint8_t flag)
+{
+    this->io[IO_ADDR_INTERRUPT_FLAG] |= flag;
+}
+
 uint8_t Memory::Read8(uint16_t address)
 {
-    const MemoryMapEntry* entry = MemoryRegion(address);
-    if (entry != nullptr && entry->read_handler != nullptr)
+    if (address < ADDR_ROM_END)
     {
-        uint16_t offset = address - entry->addr_start;
-        return (this->*entry->read_handler)(offset);
+        if (use_boot_rom && (address < ADDR_BOOT_ROM_END || (uses_cgb_bootrom && address >= ADDR_CGB_BOOT_ROM_BEGIN &&
+            address < ADDR_CGB_BOOT_ROM_END)))
+            return boot_rom[address];
+        return cartridge->ReadRom(address);
     }
 
-    fprintf(stderr, "Invalid read at address 0x%04X - no handler found\n", address);
-    exit(1);
-    return 0;
+    if (address < ADDR_VRAM_END)
+        return use_extra_vram ? vram2[address - ADDR_VRAM_BEGIN] : vram1[address - ADDR_VRAM_BEGIN];
+
+    if (address < ADDR_EXT_RAM_END)
+        return cartridge->ReadRam(address - ADDR_EXT_RAM_BEGIN);
+
+    if (address < ADDR_WRAM0_END)
+        return wram0[address - ADDR_WRAM0_BEGIN];
+
+    if (address < ADDR_WRAM_BANKED_END)
+        return wram_banks[wram_bank - 1][address - ADDR_WRAMX_BEGIN];
+
+    if (address < ADDR_ECHO_END)
+        return wram0[address - ADDR_ECHO_BEGIN];
+
+    if (address < ADDR_OAM_END)
+        return oam[address - ADDR_OAM_BEGIN];
+
+    if (address < ADDR_UNUSABLE_END)
+        return 0xFF;
+
+    if (address < ADDR_IO_END)
+        return ReadIO(address - ADDR_IO_BEGIN);
+
+    if (address < ADDR_HRAM_END)
+        return hram[address - ADDR_HRAM_BEGIN];
+
+    return ie;
+}
+
+void Memory::Write8(uint16_t address, uint8_t value)
+{
+    if (address < ADDR_ROM_END)
+    {
+        cartridge->WriteRom(address, value);
+        return;
+    }
+
+    if (address < ADDR_VRAM_END)
+    {
+        if (use_extra_vram)
+            vram2[address - ADDR_VRAM_BEGIN] = value;
+        else
+            vram1[address - ADDR_VRAM_BEGIN] = value;
+
+        return;
+    }
+
+    if (address < ADDR_EXT_RAM_END)
+    {
+        cartridge->WriteRam(address - ADDR_EXT_RAM_BEGIN, value);
+        return;
+    }
+
+    if (address < ADDR_WRAM0_END)
+    {
+        wram0[address - ADDR_WRAM0_BEGIN] = value;
+        return;
+    }
+
+    if (address < ADDR_WRAM_BANKED_END)
+    {
+        wram_banks[wram_bank - 1][address - ADDR_WRAMX_BEGIN] = value;
+        return;
+    }
+
+    if (address < ADDR_ECHO_END)
+    {
+        wram0[address - ADDR_ECHO_BEGIN] = value;
+        return;
+    }
+
+    if (address < ADDR_OAM_END)
+    {
+        oam[address - ADDR_OAM_BEGIN] = value;
+        return;
+    }
+
+    if (address < ADDR_UNUSABLE_END)
+        return;
+
+    if (address < ADDR_IO_END)
+    {
+        WriteIO(address - ADDR_IO_BEGIN, value);
+        return;
+    }
+
+    if (address < ADDR_HRAM_END)
+    {
+        hram[address - ADDR_HRAM_BEGIN] = value;
+        return;
+    }
+
+    ie = value;
 }
 
 uint16_t Memory::Read16(uint16_t address)
 {
     return Read8(address) | (Read8(address + 1) << 8);
-}
-
-void Memory::Write8(uint16_t address, uint8_t value)
-{
-    const MemoryMapEntry* entry = MemoryRegion(address);
-    if (entry != nullptr && entry->write_handler != nullptr)
-    {
-        uint16_t offset = address - entry->addr_start;
-        (this->*(entry->write_handler))(offset, value);
-        return;
-    }
-
-    fprintf(stderr, "Invalid write at address 0x%04X - no handler found\n", address);
-    exit(1);
 }
 
 void Memory::Write16(uint16_t address, uint16_t value)
@@ -118,6 +153,24 @@ uint8_t Memory::ReadVRAMBank(bool use_extra_bank, uint16_t offset)
     return use_extra_bank ? this->vram2[offset] : this->vram1[offset];
 }
 
+void Memory::WriteVRAM(uint16_t offset, uint8_t value)
+{
+    if (use_extra_vram)
+        vram2[offset] = value;
+    else
+        vram1[offset] = value;
+}
+
+uint8_t* Memory::VRAMPtr(bool use_extra_bank)
+{
+    return use_extra_bank ? vram2 : vram1;
+}
+
+uint8_t* Memory::OAMPtr()
+{
+    return oam;
+}
+
 void Memory::AttachCartridge(Cartridge* cart)
 {
     this->cartridge = cart;
@@ -127,84 +180,6 @@ bool Memory::IsCGB() const
 {
     return this->cartridge->HasCGBSupport() && this->uses_cgb_bootrom;
 }
-
-uint8_t Memory::ReadCartridgeRom(uint16_t offset)
-{
-    if (this->use_boot_rom && ((offset < 0x100) || (this->uses_cgb_bootrom && offset >= 0x200 && offset < 0x900)))
-    {
-        return this->boot_rom[offset];
-    }
-
-    return this->cartridge->ReadRom(offset);
-}
-
-void Memory::WriteCartridgeRom(uint16_t offset, uint8_t value)
-{
-    this->cartridge->WriteRom(offset, value);
-}
-
-uint8_t Memory::ReadCartridgeRam(uint16_t offset)
-{
-    return this->cartridge->ReadRam(offset);
-}
-
-void Memory::WriteCartridgeRam(uint16_t offset, uint8_t value)
-{
-    this->cartridge->WriteRam(offset, value);
-}
-
-uint8_t Memory::ReadWRAM0(uint16_t offset)
-{
-    return this->wram0[offset];
-}
-
-void Memory::WriteWRAM0(uint16_t offset, uint8_t value)
-{
-    this->wram0[offset] = value;
-}
-
-uint8_t Memory::ReadWRAMBank(uint16_t offset)
-{
-    return this->wram_banks[wram_bank - 1][offset];
-}
-
-void Memory::WriteWRAMBank(uint16_t offset, uint8_t value)
-{
-    this->wram_banks[wram_bank - 1][offset] = value;
-}
-
-uint8_t Memory::ReadVRAM(uint16_t offset)
-{
-    return this->use_extra_vram ? this->vram2[offset] : this->vram1[offset];
-}
-
-void Memory::WriteVRAM(uint16_t offset, uint8_t value)
-{
-    if (this->use_extra_vram)
-        this->vram2[offset] = value;
-    else
-        this->vram1[offset] = value;
-}
-
-uint8_t Memory::ReadOAM(uint16_t offset)
-{
-    return this->oam[offset];
-}
-
-void Memory::WriteOAM(uint16_t offset, uint8_t value)
-{
-    this->oam[offset] = value;
-}
-
-uint8_t Memory::ReadInvalid(uint16_t offset)
-{
-    return 0xFF;
-}
-
-void Memory::WriteInvalid(uint16_t offset, uint8_t value)
-{
-}
-
 
 uint8_t Memory::ReadIO(uint16_t offset)
 {
@@ -223,52 +198,20 @@ void Memory::WriteIO(uint16_t offset, uint8_t value)
     }
 
     if (offset == IO_ADDR_VBK)
-    {
         this->use_extra_vram = value & VBK_ENABLE_MASK;
-    }
 
     if (offset == IO_ADDR_WBK)
-    {
         this->wram_bank = std::max(1, value & WBK_BANK_MASK);
-    }
 
     if (offset == IO_ADDR_BOOT && value != 0)
-    {
         this->use_boot_rom = false;
-    }
 
     if (offset == IO_ADDR_OAM_DMA)
     {
-        // dma transfer to oam
         uint16_t src = value << 8;
         for (uint16_t dst = OAM_BEGIN; dst <= OAM_END; dst++, src++)
             this->oam[dst - OAM_BEGIN] = this->Read8(src);
     }
 
     this->io[offset] = value;
-}
-
-uint8_t Memory::ReadHRAM(uint16_t offset)
-{
-    return this->hram[offset];
-}
-
-void Memory::WriteHRAM(uint16_t offset, uint8_t value)
-{
-    this->hram[offset] = value;
-}
-
-uint8_t Memory::ReadIE(uint16_t offset)
-{
-    return this->ie;
-}
-
-void Memory::WriteIE(uint16_t offset, uint8_t value)
-{
-    this->ie = value;
-}
-
-uint8_t* Memory::OAMPtr()
-{
-    return oam;
 }

@@ -1,10 +1,8 @@
 #pragma once
 #include <cstdint>
-#include <vector>
 
 #include "cartridge.h"
 
-#define GB_ROM_SIZE 0x100
 #define GB_DMG_BOOT_ROM_SIZE 0x100
 #define GB_CGB_BOOT_ROM_SIZE 0x900
 #define GB_WRAM_SIZE 0x1000
@@ -15,35 +13,53 @@
 
 #define GB_WRAM_BANK_MAX 8
 
+#define ADDR_ROM_END 0x8000
+
+#define ADDR_VRAM_BEGIN 0x8000
+#define ADDR_VRAM_END 0xA000
+
+#define ADDR_EXT_RAM_BEGIN 0xA000
+#define ADDR_EXT_RAM_END 0xC000
+
+#define ADDR_WRAM0_BEGIN 0xC000
+#define ADDR_WRAM0_END 0xD000
+
+#define ADDR_WRAMX_BEGIN 0xD000
+#define ADDR_WRAM_BANKED_END 0xE000
+
+#define ADDR_ECHO_BEGIN 0xE000
+#define ADDR_ECHO_END 0xFE00
+
+#define ADDR_OAM_BEGIN 0xFE00
+#define ADDR_OAM_END 0xFEA0
+
+#define ADDR_UNUSABLE_END 0xFF00
+
+#define ADDR_IO_BEGIN 0xFF00
+#define ADDR_IO_END 0xFF80
+
+#define ADDR_HRAM_BEGIN 0xFF80
+#define ADDR_HRAM_END 0xFFFF
+
+#define ADDR_BOOT_ROM_END 0x100
+#define ADDR_CGB_BOOT_ROM_BEGIN 0x200
+#define ADDR_CGB_BOOT_ROM_END 0x900
+
 #define IO_ADDR_OAM_DMA 0x46
 #define IO_ADDR_BOOT 0x50
 #define IO_ADDR_JOYP 0x00
 #define IO_ADDR_VBK 0x4F
 #define IO_ADDR_WBK 0x70
+#define IO_ADDR_INTERRUPT_FLAG 0x0F
 
 #define VBK_ENABLE_MASK 0b00000001
 #define WBK_BANK_MASK 0b00000111
 
-#define OAM_BEGIN 0xfe00
-#define OAM_END 0xfe9f
+#define OAM_BEGIN 0xFE00
+#define OAM_END 0xFE9F
 
-#define MAX_MEMORY_MAP_ENTRIES 16
-
-class Memory;
 class CPU;
-
-typedef uint8_t (Memory::*ReadFunc)(uint16_t offset);
-typedef void (Memory::*WriteFunc)(uint16_t offset, uint8_t value);
-
-struct MemoryMapEntry
-{
-    uint16_t addr_start = 0;
-    uint16_t addr_end = 0;
-    ReadFunc read_handler = nullptr;
-    WriteFunc write_handler = nullptr;
-    bool enabled = false;
-};
-
+class Memory;
 
 typedef uint8_t (*IOReadFunc)(void* ctx, uint8_t* io, uint16_t offset);
 typedef void (*IOWriteFunc)(void* ctx, uint8_t* io, uint16_t offset, uint8_t);
@@ -60,16 +76,14 @@ class Memory
 public:
     Memory();
 
-    // TODO please make a bus for all this communication!!
     void AttachCPU(CPU* cpu);
+    void AttachCartridge(Cartridge* cart);
 
     void LoadBootRom(char* boot_rom_path);
-    void InitializeMemoryMap();
-    void RegisterMemoryRegion(uint16_t start, uint16_t end,
-                              ReadFunc read, WriteFunc write);
 
     template <class T>
-    void RegisterIOMemoryRegion(uint8_t start, uint8_t end, T* obj, uint8_t (T::*read)(uint8_t*, uint16_t),
+    void RegisterIOMemoryRegion(uint8_t start, uint8_t end, T* obj,
+                                uint8_t (T::*read)(uint8_t*, uint16_t),
                                 void (T::*write)(uint8_t*, uint16_t, uint8_t))
     {
         static uint8_t (T::*inst_read)(uint8_t*, uint16_t) = read;
@@ -77,7 +91,8 @@ public:
 
         for (uint8_t i = start; i <= end; i++)
         {
-            io_lut[i] = {
+            io_lut[i] =
+            {
                 .ctx = obj,
                 .read = [](void* ctx, uint8_t* io, uint16_t off)
                 {
@@ -104,39 +119,17 @@ public:
     uint8_t* PtrIO(uint8_t offset) { return &this->io[offset]; }
 
     uint8_t ReadVRAMBank(bool use_extra_bank, uint16_t offset);
-
-    void AttachCartridge(Cartridge* cart);
+    void WriteVRAM(uint16_t offset, uint8_t value);
+    uint8_t* VRAMPtr(bool use_extra_bank);
+    uint8_t* OAMPtr();
 
     bool IsCGB() const;
 
     uint8_t ie = 0;
-
     Cartridge* cartridge = nullptr;
 
-    uint8_t ReadCartridgeRom(uint16_t offset);
-    uint8_t ReadCartridgeRam(uint16_t offset);
-    uint8_t ReadWRAM0(uint16_t offset);
-    uint8_t ReadWRAMBank(uint16_t offset);
-    uint8_t ReadVRAM(uint16_t offset);
-    uint8_t ReadOAM(uint16_t offset);
-    uint8_t ReadInvalid(uint16_t offset);
-    uint8_t ReadHRAM(uint16_t offset);
-    uint8_t ReadIE(uint16_t offset);
-
-    void WriteCartridgeRom(uint16_t offset, uint8_t value);
-    void WriteCartridgeRam(uint16_t offset, uint8_t value);
-    void WriteWRAM0(uint16_t offset, uint8_t value);
-    void WriteWRAMBank(uint16_t offset, uint8_t value);
-    void WriteVRAM(uint16_t offset, uint8_t value);
-    void WriteOAM(uint16_t offset, uint8_t value);
-    void WriteInvalid(uint16_t offset, uint8_t value);
-    void WriteHRAM(uint16_t offset, uint8_t value);
-    void WriteIE(uint16_t offset, uint8_t value);
-
-    uint8_t* OAMPtr();
-
 private:
-    MemoryMapEntry* MemoryRegion(uint16_t address);
+    CPU* cpu = nullptr;
 
     uint8_t wram_bank = 1;
     uint8_t wram0[GB_WRAM_SIZE] = {};
@@ -154,9 +147,5 @@ private:
     bool uses_cgb_bootrom = false;
     uint8_t boot_rom[GB_CGB_BOOT_ROM_SIZE] = {};
 
-    std::vector<MemoryMapEntry> memory_map = {};
-
     IOHandler io_lut[GB_IO_SIZE] = {};
-
-    CPU* cpu;
 };

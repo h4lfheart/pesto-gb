@@ -1418,7 +1418,7 @@ InstructionDef* InstructionSet::instructions[INSTRUCTION_SET_SIZE] = {
     new InstructionDef("ADC A, B", 0x88, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_B),
     new InstructionDef("ADC A, C", 0x89, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_C),
     new InstructionDef("ADC A, D", 0x8A, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_D),
-    new InstructionDef("ADC A, A", 0x8B, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_E),
+    new InstructionDef("ADC A, E", 0x8B, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_E),
     new InstructionDef("ADC A, H", 0x8C, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_H),
     new InstructionDef("ADC A, L", 0x8D, adc_r8_r8, 1, 1, 1, RegisterType::REG_A, RegisterType::REG_L),
     new InstructionDef("ADC A, (HL)", 0x8E, adc_r8_m16, 1, 2, 2, RegisterType::REG_A, RegisterType::REG_HL),

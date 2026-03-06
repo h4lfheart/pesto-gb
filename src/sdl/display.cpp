@@ -2,6 +2,8 @@
 #include <cstring>
 #include <string>
 
+static constexpr uint32_t FPS_WINDOW_MS = 1000;
+
 Display::Display() : window(nullptr), renderer(nullptr), texture(nullptr) {}
 
 Display::~Display() {
@@ -15,6 +17,8 @@ bool Display::Initialize(std::string rom_name) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         return false;
     }
+
+    this->rom_name = rom_name;
 
     char name_buf[64];
     snprintf(name_buf, 64, "Pesto GB - %s", rom_name.c_str());
@@ -49,9 +53,29 @@ bool Display::Initialize(std::string rom_name) {
         return false;
     }
 
+    fps_window_start = SDL_GetTicks();
+
     Clear();
 
     return true;
+}
+
+void Display::UpdateFPS() {
+    fps_frame_count++;
+
+    uint32_t now = SDL_GetTicks();
+    uint32_t elapsed = now - fps_window_start;
+
+    if (elapsed >= FPS_WINDOW_MS) {
+        float fps = fps_frame_count / (elapsed / 1000.0f);
+
+        char title_buf[64];
+        snprintf(title_buf, 64, "Pesto GB - %s [%.0f FPS]", rom_name.c_str(), fps);
+        SDL_SetWindowTitle(window, title_buf);
+
+        fps_frame_count = 0;
+        fps_window_start = now;
+    }
 }
 
 void Display::Update(uint16_t* pixels) {
@@ -62,7 +86,7 @@ void Display::Update(uint16_t* pixels) {
         uint8_t r = (color & 0x1F) << 3;
         uint8_t g = ((color >> 5) & 0x1F) << 3;
         uint8_t b = ((color >> 10) & 0x1F) << 3;
-        framebuffer[i] =  0xFF << 24 | (r << 16) | (g << 8) | b;
+        framebuffer[i] = 0xFF << 24 | (r << 16) | (g << 8) | b;
     }
 
     SDL_UpdateTexture(texture, nullptr, framebuffer, WIDTH * sizeof(uint32_t));
@@ -84,6 +108,8 @@ void Display::Update(uint16_t* pixels) {
     }
 
     SDL_RenderPresent(renderer);
+
+    UpdateFPS();
 }
 
 void Display::Clear() {

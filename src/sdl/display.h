@@ -18,7 +18,13 @@ public:
     void Clear();
 
 private:
+    void UpdateFPS();
+
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
+
+    std::string rom_name;
+    uint32_t fps_frame_count = 0;
+    uint32_t fps_window_start = 0;
 };
