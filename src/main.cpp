@@ -78,6 +78,9 @@ int main(int argc, char** argv)
                 case SDLK_RSHIFT:
                     game_boy.PressButton(InputButton::BUTTON_SELECT);
                     break;
+                case SDLK_TAB:
+                    game_boy.SetSpeedup(true);
+                    break;
                 }
             }
 
@@ -108,6 +111,9 @@ int main(int argc, char** argv)
                     break;
                 case SDLK_RSHIFT:
                     game_boy.ReleaseButton(InputButton::BUTTON_SELECT);
+                    break;
+                case SDLK_TAB:
+                    game_boy.SetSpeedup(false);
                     break;
                 }
             }

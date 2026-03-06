@@ -46,8 +46,17 @@ void GameBoy::Run()
 
     while (this->is_running)
     {
-        int frame_mcycles = (int)((CLOCK_RATE / T_CYCLES_PER_M_CYCLE) / FRAMES_PER_SECOND);
+        if (!this->is_speedup)
+        {
+            const int64_t next_frame = frame_start + FRAME_BUDGET_NS;
+            const int64_t sleep_ns = next_frame - now_ns();
+            if (sleep_ns > 0)
+                std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_ns));
 
+            frame_start = next_frame;
+        }
+
+        int frame_mcycles = static_cast<int>((CLOCK_RATE / T_CYCLES_PER_M_CYCLE) / FRAMES_PER_SECOND);
         while (frame_mcycles > 0)
         {
             const int mcycles = this->cpu->Cycle();
@@ -73,22 +82,50 @@ void GameBoy::Run()
                 this->apu->ready_for_samples = false;
             }
         }
-
-        const int64_t next_frame = frame_start + FRAME_BUDGET_NS;
-        const int64_t sleep_ns = next_frame - now_ns();
-        if (sleep_ns > 0)
-            std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_ns));
-
-        frame_start = next_frame;
     }
 }
 
-void GameBoy::Stop() { this->is_running = false; }
-bool GameBoy::IsRunning() { return this->is_running; }
+void GameBoy::Stop()
+{
+    this->is_running = false;
+}
 
-void GameBoy::PressButton(InputButton button) { this->input->PressButton(button); }
-void GameBoy::ReleaseButton(InputButton button) { this->input->ReleaseButton(button); }
-void GameBoy::OnDraw(const DrawFunction onDraw) { this->OnDrawFunction = onDraw; }
-void GameBoy::OnAudio(const AudioFunction onAudio) { this->OnAudioFunction = onAudio; }
-void GameBoy::ReadSave(const char* path) { this->cartridge->ReadSave(path); }
-void GameBoy::WriteSave(const char* path) { this->cartridge->WriteSave(path); }
+bool GameBoy::IsRunning()
+{
+    return this->is_running;
+}
+
+void GameBoy::PressButton(InputButton button)
+{
+    this->input->PressButton(button);
+}
+
+void GameBoy::ReleaseButton(InputButton button)
+{
+    this->input->ReleaseButton(button);
+}
+
+void GameBoy::OnDraw(const DrawFunction onDraw)
+{
+    this->OnDrawFunction = onDraw;
+}
+
+void GameBoy::OnAudio(const AudioFunction onAudio)
+{
+    this->OnAudioFunction = onAudio;
+}
+
+void GameBoy::ReadSave(const char* path)
+{
+    this->cartridge->ReadSave(path);
+}
+
+void GameBoy::WriteSave(const char* path)
+{
+    this->cartridge->WriteSave(path);
+}
+
+void GameBoy::SetSpeedup(bool speedup)
+{
+    this->is_speedup = speedup;
+}

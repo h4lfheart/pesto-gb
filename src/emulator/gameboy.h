@@ -30,6 +30,8 @@ public:
     void ReadSave(const char* path);
     void WriteSave(const char* path);
 
+    void SetSpeedup(bool speedup);
+
     DrawFunction OnDrawFunction;
     AudioFunction OnAudioFunction;
 
@@ -43,4 +45,5 @@ private:
     APU* apu;
 
     bool is_running = false;
+    bool is_speedup = false;
 };
