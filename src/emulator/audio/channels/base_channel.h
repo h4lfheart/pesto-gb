@@ -28,7 +28,6 @@ public:
     virtual ~BaseChannel() = default;
     virtual void AttachMemory(Memory* mem);
 
-    virtual void Tick() = 0;
     virtual void TickFrame(uint8_t frame_idx);
     virtual void Reset();
 

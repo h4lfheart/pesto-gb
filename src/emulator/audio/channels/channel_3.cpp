@@ -1,9 +1,9 @@
 #include "channel_3.h"
 
-void Channel3::Tick()
+void Channel3::Tick(uint16_t cycles)
 {
-    this->volume = (*nr32 & CH3_NR32_VOLUME_MASK) >> 5;
-    this->period = ((*nr34 & CH_NRx4_PERIOD_HIGH_MASK) << 8) | *nr33;
+    this->volume = (*NR32 & CH3_NR32_VOLUME_MASK) >> 5;
+    this->period = ((*NR34 & CH_NRx4_PERIOD_HIGH_MASK) << 8) | *NR33;
 
     if (!(this->is_enabled && this->IsDACEnabled()))
     {
@@ -11,11 +11,14 @@ void Channel3::Tick()
         return;
     }
 
-    this->period_timer--;
-    if (this->period_timer == 0)
+    this->period_timer -= cycles;
+    if (this->period_timer <= 0)
     {
-        this->period_timer = (CH_PERIOD_START - this->period) * CH_PERIOD_MULTIPLIER / 2;
-        this->wave_step = (this->wave_step + 1) & 31;
+        const int reload = (CH_PERIOD_START - this->period) * CH_PERIOD_MULTIPLIER / 2;
+        const int ticks = 1 + (-this->period_timer / reload);
+
+        this->period_timer += ticks * reload;
+        this->wave_step = (this->wave_step + ticks) & 31;
     }
 
     const uint8_t byte = this->memory->ReadIO(CH3_WAVE_RAM_START + (this->wave_step >> 1));
@@ -43,26 +46,26 @@ void Channel3::Reset()
 
 bool Channel3::IsDACEnabled()
 {
-    return (*nr30 & CH3_NR30_DAC_MASK) != 0;
+    return (*NR30 & CH3_NR30_DAC_MASK) != 0;
 }
 
 void Channel3::AttachMemory(Memory* mem)
 {
     BaseChannel::AttachMemory(mem);
 
-    this->nr30 = mem->PtrIO(CH3_NR30_ADDR);
-    this->nr31 = mem->PtrIO(CH3_NR31_ADDR);
-    this->nr32 = mem->PtrIO(CH3_NR32_ADDR);
-    this->nr33 = mem->PtrIO(CH3_NR33_ADDR);
-    this->nr34 = mem->PtrIO(CH3_NR34_ADDR);
+    this->NR30 = mem->PtrIO(CH3_NR30_ADDR);
+    this->NR31 = mem->PtrIO(CH3_NR31_ADDR);
+    this->NR32 = mem->PtrIO(CH3_NR32_ADDR);
+    this->NR33 = mem->PtrIO(CH3_NR33_ADDR);
+    this->NR34 = mem->PtrIO(CH3_NR34_ADDR);
 }
 
 void Channel3::Trigger()
 {
     this->is_enabled = IsDACEnabled();
 
-    this->period = ((*nr34 & CH_NRx4_PERIOD_HIGH_MASK) << 8) | *nr33;
-    this->volume = (*nr32 & CH3_NR32_VOLUME_MASK) >> 5;
+    this->period = ((*NR34 & CH_NRx4_PERIOD_HIGH_MASK) << 8) | *NR33;
+    this->volume = (*NR32 & CH3_NR32_VOLUME_MASK) >> 5;
 
     this->period_timer = (CH_PERIOD_START - this->period) * CH_PERIOD_MULTIPLIER / 2;
 
@@ -83,7 +86,7 @@ void Channel3::Trigger()
 
 void Channel3::TickLength()
 {
-    if ((*nr34 & CH_NRx4_LENGTH_ENABLE_MASK) == 0)
+    if ((*NR34 & CH_NRx4_LENGTH_ENABLE_MASK) == 0)
         return;
 
     if (this->length_timer > 0)

@@ -1,7 +1,5 @@
 #include "apu.h"
 
-#include <algorithm>
-
 APU::APU()
 {
     this->channel1 = new Channel1();
@@ -26,66 +24,56 @@ void APU::Cycle(uint8_t cycles)
         TickFrame();
     }
 
-    const uint8_t volume = *NR50;
-    const uint8_t panning = *NR51;
-
-    const uint8_t left_volume = (volume & APU_NR50_LEFT_VOLUME_MASK) >> 4;
-    const uint8_t right_volume = (volume & APU_NR50_RIGHT_VOLUME_MASK);
-
-    for (int t = 0; t < cycles; t++)
+    this->sample_counter += cycles;
+    if (this->sample_counter >= APU_CYCLES_PER_SAMPLE)
     {
-        this->channel1->Tick();
-        this->channel2->Tick();
-        this->channel3->Tick();
-        this->channel4->Tick();
+        this->sample_counter -= APU_CYCLES_PER_SAMPLE;
 
-        this->sample_counter++;
-        if (this->sample_counter >= APU_CYCLES_PER_SAMPLE)
-        {
-            this->sample_counter = 0;
+        this->channel1->Tick(APU_CYCLES_PER_SAMPLE);
+        this->channel2->Tick(APU_CYCLES_PER_SAMPLE);
+        this->channel3->Tick(APU_CYCLES_PER_SAMPLE);
+        this->channel4->Tick(APU_CYCLES_PER_SAMPLE);
 
-            const float ch1_raw = this->channel1->GetOutput();
-            const float ch2_raw = this->channel2->GetOutput();
-            const float ch3_raw = this->channel3->GetOutput();
-            const float ch4_raw = this->channel4->GetOutput();
-
-            const float channel1_data = this->channel1->IsDACEnabled()
-                                            ? (ch1_raw - this->channel1->volume * 0.5f) / APU_MAX_VOLUME
-                                            : 0;
-            const float channel2_data = this->channel2->IsDACEnabled()
-                                            ? (ch2_raw - this->channel2->volume * 0.5f) / APU_MAX_VOLUME
-                                            : 0;
-            const float channel3_data = this->channel3->IsDACEnabled()
-                                            ? (ch3_raw - this->channel3->dc_offset) / APU_MAX_VOLUME
-                                            : 0;
-            const float channel4_data = this->channel4->IsDACEnabled()
-                                            ? (ch4_raw - this->channel4->volume * 0.5f) / APU_MAX_VOLUME
-                                            : 0;
-
-            float left = 0.0f;
-            float right = 0.0f;
-
-            if (panning & APU_NR51_CH1_LEFT_MASK) left += channel1_data;
-            if (panning & APU_NR51_CH1_RIGHT_MASK) right += channel1_data;
-            if (panning & APU_NR51_CH2_LEFT_MASK) left += channel2_data;
-            if (panning & APU_NR51_CH2_RIGHT_MASK) right += channel2_data;
-            if (panning & APU_NR51_CH3_LEFT_MASK) left += channel3_data;
-            if (panning & APU_NR51_CH3_RIGHT_MASK) right += channel3_data;
-            if (panning & APU_NR51_CH4_LEFT_MASK) left += channel4_data;
-            if (panning & APU_NR51_CH4_RIGHT_MASK) right += channel4_data;
-
-            left /= APU_CHANNEL_COUNT;
-            right /= APU_CHANNEL_COUNT;
-
-            left *= static_cast<float>(left_volume) / APU_VOLUME_DIVISOR;
-            right *= static_cast<float>(right_volume) / APU_VOLUME_DIVISOR;
-
-            this->sample_left = std::clamp(left * 2.0f, -1.0f, 1.0f);
-            this->sample_right = std::clamp(right * 2.0f, -1.0f, 1.0f);
-
-            this->ready_for_samples = true;
-        }
+        MixSample();
     }
+}
+
+void APU::MixSample()
+{
+    const uint8_t vol = *NR50;
+    const uint8_t panning = *NR51;
+    const uint8_t left_volume = (vol & APU_NR50_LEFT_VOLUME_MASK) >> 4;
+    const uint8_t right_volume = (vol & APU_NR50_RIGHT_VOLUME_MASK);
+
+    const float ch1 = channel1->IsDACEnabled()
+                          ? (static_cast<float>(channel1->output) - channel1->volume * 0.5f) / APU_MAX_VOLUME
+                          : 0.0f;
+    const float ch2 = channel2->IsDACEnabled()
+                          ? (static_cast<float>(channel2->output) - channel2->volume * 0.5f) / APU_MAX_VOLUME
+                          : 0.0f;
+    const float ch3 = channel3->IsDACEnabled()
+                          ? (static_cast<float>(channel3->output) - channel3->dc_offset) / APU_MAX_VOLUME
+                          : 0.0f;
+    const float ch4 = channel4->IsDACEnabled()
+                          ? (static_cast<float>(channel4->output) - channel4->volume * 0.5f) / APU_MAX_VOLUME
+                          : 0.0f;
+
+    float left = 0.0f, right = 0.0f;
+    if (panning & APU_NR51_CH1_LEFT_MASK) left += ch1;
+    if (panning & APU_NR51_CH1_RIGHT_MASK) right += ch1;
+    if (panning & APU_NR51_CH2_LEFT_MASK) left += ch2;
+    if (panning & APU_NR51_CH2_RIGHT_MASK) right += ch2;
+    if (panning & APU_NR51_CH3_LEFT_MASK) left += ch3;
+    if (panning & APU_NR51_CH3_RIGHT_MASK) right += ch3;
+    if (panning & APU_NR51_CH4_LEFT_MASK) left += ch4;
+    if (panning & APU_NR51_CH4_RIGHT_MASK) right += ch4;
+
+    left = left / APU_CHANNEL_COUNT * static_cast<float>(left_volume) / APU_VOLUME_DIVISOR;
+    right = right / APU_CHANNEL_COUNT * static_cast<float>(right_volume) / APU_VOLUME_DIVISOR;
+
+    this->sample_left = left < -1.0f ? -1.0f : (left > 1.0f ? 1.0f : left);
+    this->sample_right = right < -1.0f ? -1.0f : (right > 1.0f ? 1.0f : right);
+    this->ready_for_samples = true;
 }
 
 void APU::AttachMemory(Memory* mem)
@@ -159,16 +147,13 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
         else if (!enable && enabled)
         {
             enabled = false;
-
             channel1->Reset();
             channel2->Reset();
             channel3->Reset();
             channel4->Reset();
-
             for (uint8_t i = APU_REG_START; i <= APU_REG_END; i++)
                 io[i] = 0x00;
         }
-
         return;
     }
 
@@ -193,7 +178,6 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
             io[offset] = value & CH_NRx1_LENGTH_MASK;
             break;
         }
-
         return;
     }
 
@@ -201,98 +185,72 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
     {
     case CH1_NR10_ADDR:
         {
-            bool old_negate = (*channel1->nr10 & CH1_NR10_SWEEP_DIR_MASK) != 0;
+            bool old_negate = (*channel1->NR10 & CH1_NR10_SWEEP_DIR_MASK) != 0;
             io[offset] = value;
-            bool new_negate = (*channel1->nr10 & CH1_NR10_SWEEP_DIR_MASK) != 0;
+            bool new_negate = (*channel1->NR10 & CH1_NR10_SWEEP_DIR_MASK) != 0;
             if (old_negate && !new_negate && channel1->sweep_negate_used)
                 channel1->is_enabled = false;
             break;
         }
-
     case CH1_NR11_ADDR:
         channel1->length_timer = CH_6BIT_LENGTH_MAX - (value & CH_NRx1_LENGTH_MASK);
         break;
-
     case CH2_NR21_ADDR:
         channel2->length_timer = CH_6BIT_LENGTH_MAX - (value & CH_NRx1_LENGTH_MASK);
         break;
-
     case CH3_NR31_ADDR:
         channel3->length_timer = CH_8BIT_LENGTH_MAX - value;
         break;
-
     case CH4_NR41_ADDR:
         channel4->length_timer = CH_6BIT_LENGTH_MAX - (value & CH_NRx1_LENGTH_MASK);
         break;
 
     case CH1_NR12_ADDR:
         {
-            uint8_t old_pace = *channel1->nr12 & CH_NRx2_ENV_PACE_MASK;
-            bool old_increase = *channel1->nr12 & CH_NRx2_ENVELOPE_DIR_MASK;
-
+            uint8_t old_pace = *channel1->NR12 & CH_NRx2_ENV_PACE_MASK;
+            bool old_increase = *channel1->NR12 & CH_NRx2_ENVELOPE_DIR_MASK;
             io[offset] = value;
-
-            if ((value & CH_NRx2_DAC_MASK) == 0)
-                channel1->is_enabled = false;
-
+            if ((value & CH_NRx2_DAC_MASK) == 0) channel1->is_enabled = false;
             if (channel1->is_enabled)
             {
-                if (old_pace == 0 && channel1->is_envelope_alive)
-                    channel1->volume++;
-                else if (!old_increase)
-                    channel1->volume += 2;
-                if (old_increase != (bool)(value & CH_NRx2_ENVELOPE_DIR_MASK))
+                if (old_pace == 0 && channel1->is_envelope_alive) channel1->volume++;
+                else if (!old_increase) channel1->volume += 2;
+                if (old_increase != static_cast<bool>(value & CH_NRx2_ENVELOPE_DIR_MASK))
                     channel1->volume = 16 - channel1->volume;
                 channel1->volume &= 0xF;
             }
             break;
         }
-
     case CH2_NR22_ADDR:
         {
-            uint8_t old_pace = *channel2->nr22 & CH_NRx2_ENV_PACE_MASK;
-            bool old_increase = *channel2->nr22 & CH_NRx2_ENVELOPE_DIR_MASK;
-
+            uint8_t old_pace = *channel2->NR22 & CH_NRx2_ENV_PACE_MASK;
+            bool old_increase = *channel2->NR22 & CH_NRx2_ENVELOPE_DIR_MASK;
             io[offset] = value;
-
-            if ((value & CH_NRx2_DAC_MASK) == 0)
-                channel2->is_enabled = false;
-
+            if ((value & CH_NRx2_DAC_MASK) == 0) channel2->is_enabled = false;
             if (channel2->is_enabled)
             {
-                if (old_pace == 0 && channel2->is_envelope_alive)
-                    channel2->volume++;
-                else if (!old_increase)
-                    channel2->volume += 2;
-                if (old_increase != (bool)(value & CH_NRx2_ENVELOPE_DIR_MASK))
+                if (old_pace == 0 && channel2->is_envelope_alive) channel2->volume++;
+                else if (!old_increase) channel2->volume += 2;
+                if (old_increase != static_cast<bool>(value & CH_NRx2_ENVELOPE_DIR_MASK))
                     channel2->volume = 16 - channel2->volume;
                 channel2->volume &= 0xF;
             }
             break;
         }
-
     case CH3_NR30_ADDR:
-        if ((value & CH3_NR30_DAC_MASK) == 0)
-            channel3->is_enabled = false;
+        if ((value & CH3_NR30_DAC_MASK) == 0) channel3->is_enabled = false;
         break;
-
     case CH4_NR42_ADDR:
         {
-            uint8_t old_pace = *channel4->nr42 & CH_NRx2_ENV_PACE_MASK;
-            bool old_increase = *channel4->nr42 & CH_NRx2_ENVELOPE_DIR_MASK;
-
+            uint8_t old_pace = *channel4->NR42 & CH_NRx2_ENV_PACE_MASK;
+            bool old_increase = *channel4->NR42 & CH_NRx2_ENVELOPE_DIR_MASK;
             io[offset] = value;
-
-            if ((value & CH_NRx2_DAC_MASK) == 0)
-                channel4->is_enabled = false;
-
+            if ((value & CH_NRx2_DAC_MASK) == 0) channel4->is_enabled = false;
             if (channel4->is_enabled)
             {
-                if (old_pace == 0 && channel4->is_envelope_alive)
-                    channel4->volume++;
-                else if (!old_increase)
-                    channel4->volume += 2;
-                if (old_increase != (bool)(value & CH_NRx2_ENVELOPE_DIR_MASK))
+                if (old_pace == 0 && channel4->is_envelope_alive) channel4->volume++;
+                else if (!old_increase) channel4->volume += 2;
+                if (old_increase != static_cast<bool>(value & CH_NRx2_ENVELOPE_DIR_MASK))
                     channel4->volume = 16 - channel4->volume;
                 channel4->volume &= 0xF;
             }
@@ -301,15 +259,12 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
 
     case CH1_NR14_ADDR:
         {
-            bool old_len_enable = (*channel1->nr14 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
+            bool old_len_enable = (*channel1->NR14 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool new_len_enable = (value & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool next_clocks_length = (frame_step & 1) != 0;
-
             io[offset] = value;
-
             if (!old_len_enable && new_len_enable && next_clocks_length)
                 channel1->TickLength();
-
             if (value & CH_NRx4_TRIGGER_MASK)
             {
                 bool length_was_zero = channel1->length_timer == 0;
@@ -317,22 +272,17 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
                 if (new_len_enable && next_clocks_length && length_was_zero)
                     channel1->TickLength();
             }
-
             value &= ~CH_NRx4_TRIGGER_MASK;
             break;
         }
-
     case CH2_NR24_ADDR:
         {
-            bool old_len_enable = (*channel2->nr24 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
+            bool old_len_enable = (*channel2->NR24 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool new_len_enable = (value & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool next_clocks_length = (frame_step & 1) != 0;
-
             io[offset] = value;
-
             if (!old_len_enable && new_len_enable && next_clocks_length)
                 channel2->TickLength();
-
             if (value & CH_NRx4_TRIGGER_MASK)
             {
                 bool length_was_zero = channel2->length_timer == 0;
@@ -340,22 +290,17 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
                 if (new_len_enable && next_clocks_length && length_was_zero)
                     channel2->TickLength();
             }
-
             value &= ~CH_NRx4_TRIGGER_MASK;
             break;
         }
-
     case CH3_NR34_ADDR:
         {
-            bool old_len_enable = (*channel3->nr34 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
+            bool old_len_enable = (*channel3->NR34 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool new_len_enable = (value & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool next_clocks_length = (frame_step & 1) != 0;
-
             io[offset] = value;
-
             if (!old_len_enable && new_len_enable && next_clocks_length)
                 channel3->TickLength();
-
             if (value & CH_NRx4_TRIGGER_MASK)
             {
                 bool length_was_zero = channel3->length_timer == 0;
@@ -363,22 +308,17 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
                 if (new_len_enable && next_clocks_length && length_was_zero)
                     channel3->TickLength();
             }
-
             value &= ~CH_NRx4_TRIGGER_MASK;
             break;
         }
-
     case CH4_NR44_ADDR:
         {
-            bool old_len_enable = (*channel4->nr44 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
+            bool old_len_enable = (*channel4->NR44 & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool new_len_enable = (value & CH_NRx4_LENGTH_ENABLE_MASK) != 0;
             bool next_clocks_length = (frame_step & 1) != 0;
-
             io[offset] = value;
-
             if (!old_len_enable && new_len_enable && next_clocks_length)
                 channel4->TickLength();
-
             if (value & CH_NRx4_TRIGGER_MASK)
             {
                 bool length_was_zero = channel4->length_timer == 0;
@@ -386,7 +326,6 @@ void APU::APUWrite(uint8_t* io, uint16_t offset, uint8_t value)
                 if (new_len_enable && next_clocks_length && length_was_zero)
                     channel4->TickLength();
             }
-
             value &= ~CH_NRx4_TRIGGER_MASK;
             break;
         }

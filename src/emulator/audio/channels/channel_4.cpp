@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-void Channel4::Tick()
+void Channel4::Tick(uint16_t cycles)
 {
     if (!(this->is_enabled && this->IsDACEnabled()))
     {
@@ -10,21 +10,30 @@ void Channel4::Tick()
         return;
     }
 
-    this->period_timer--;
-    if (this->period_timer == 0)
+
+    this->period_timer -= cycles;
+    if (this->period_timer <= 0)
     {
-        const uint8_t shift = (*nr43 & CH4_NR43_CLOCK_SHIFT_MASK) >> 4;
-        const uint8_t divider = *nr43 & CH4_NR43_CLOCK_DIVIDER_MASK;
-        this->period_timer = (divider == 0 ? 8 : divider << 4) << shift;
+        const uint8_t shift = (*NR43 & CH4_NR43_CLOCK_SHIFT_MASK) >> 4;
+        const uint8_t divider = *NR43 & CH4_NR43_CLOCK_DIVIDER_MASK;
 
-        const uint8_t xor_value = ((this->lfsr & 1) ^ ((this->lfsr >> 1) & 1));
-        this->lfsr = xor_value << 14 | (this->lfsr >> 1);
+        const int reload = ((divider == 0 ? 8 : divider << 4) << shift);
+        const int ticks = 1 + (-this->period_timer / reload);
 
-        if (*nr43 & CH4_NR43_LFSR_WIDTH_MASK)
-            this->lfsr = (this->lfsr & ~(1 << 6)) | (xor_value << 6);
+        this->period_timer += ticks * reload;
+
+        for (int i = 0; i < ticks; i++)
+        {
+            const uint8_t xor_value = ((this->lfsr & 1) ^ ((this->lfsr >> 1) & 1));
+
+            this->lfsr = (xor_value << 14) | (this->lfsr >> 1);
+
+            if (*NR43 & CH4_NR43_LFSR_WIDTH_MASK)
+                this->lfsr = (this->lfsr & ~(1 << 6)) | (xor_value << 6);
+        }
     }
 
-    this->output = this->lfsr & 1 ? 0 : volume;
+    this->output = (this->lfsr & 1) ? 0 : volume;
 }
 
 void Channel4::TickFrame(uint8_t frame_idx)
@@ -53,22 +62,22 @@ void Channel4::AttachMemory(Memory* mem)
 {
     BaseChannel::AttachMemory(mem);
 
-    this->nr41 = mem->PtrIO(CH4_NR41_ADDR);
-    this->nr42 = mem->PtrIO(CH4_NR42_ADDR);
-    this->nr43 = mem->PtrIO(CH4_NR43_ADDR);
-    this->nr44 = mem->PtrIO(CH4_NR44_ADDR);
+    this->NR41 = mem->PtrIO(CH4_NR41_ADDR);
+    this->NR42 = mem->PtrIO(CH4_NR42_ADDR);
+    this->NR43 = mem->PtrIO(CH4_NR43_ADDR);
+    this->NR44 = mem->PtrIO(CH4_NR44_ADDR);
 }
 
 bool Channel4::IsDACEnabled()
 {
-    return (*nr42 & CH_NRx2_DAC_MASK) != 0;
+    return (*NR42 & CH_NRx2_DAC_MASK) != 0;
 }
 
 void Channel4::Trigger()
 {
     this->is_enabled = IsDACEnabled();
 
-    this->volume = (*nr42 & CH_NRx2_VOLUME_MASK) >> 4;
+    this->volume = (*NR42 & CH_NRx2_VOLUME_MASK) >> 4;
 
     if (this->length_timer == 0)
         this->length_timer = CH_6BIT_LENGTH_MAX;
@@ -77,8 +86,8 @@ void Channel4::Trigger()
 
     this->lfsr = CH4_LFSR_DEFAULT;
 
-    const uint8_t shift = (*nr43 & CH4_NR43_CLOCK_SHIFT_MASK) >> 4;
-    const uint8_t divider = *nr43 & CH4_NR43_CLOCK_DIVIDER_MASK;
+    const uint8_t shift = (*NR43 & CH4_NR43_CLOCK_SHIFT_MASK) >> 4;
+    const uint8_t divider = *NR43 & CH4_NR43_CLOCK_DIVIDER_MASK;
     this->period_timer = (divider == 0 ? 8 : divider << 4) << shift;
 
     this->is_envelope_alive = true;
@@ -86,7 +95,7 @@ void Channel4::Trigger()
 
 void Channel4::TickLength()
 {
-    if ((*nr44 & CH_NRx4_LENGTH_ENABLE_MASK) == 0)
+    if ((*NR44 & CH_NRx4_LENGTH_ENABLE_MASK) == 0)
         return;
 
     if (this->length_timer > 0)
@@ -99,7 +108,7 @@ void Channel4::TickLength()
 
 void Channel4::TickEnvelope()
 {
-    const uint8_t pace = *nr42 & CH_NRx2_ENV_PACE_MASK;
+    const uint8_t pace = *NR42 & CH_NRx2_ENV_PACE_MASK;
     if (pace == 0)
         return;
 
@@ -108,7 +117,7 @@ void Channel4::TickEnvelope()
     {
         this->envelope_timer = 0;
 
-        bool increase_volume = *nr42 & CH_NRx2_ENVELOPE_DIR_MASK;
+        bool increase_volume = *NR42 & CH_NRx2_ENVELOPE_DIR_MASK;
         if (increase_volume && this->volume < 0xF)
         {
             this->volume++;

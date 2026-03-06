@@ -9,7 +9,7 @@
 class Channel2 : public BaseChannel
 {
 public:
-    void Tick() override;
+    void Tick(uint16_t cycles);
     void TickFrame(uint8_t frame_idx) override;
     void Reset() override;
     void AttachMemory(Memory* mem) override;
@@ -20,13 +20,13 @@ public:
     void TickLength();
     void TickEnvelope();
 
-    uint8_t* nr21 = nullptr;
-    uint8_t* nr22 = nullptr;
-    uint8_t* nr23 = nullptr;
-    uint8_t* nr24 = nullptr;
+    uint8_t* NR21 = nullptr;
+    uint8_t* NR22 = nullptr;
+    uint8_t* NR23 = nullptr;
+    uint8_t* NR24 = nullptr;
 
     uint16_t period = 0;
-    uint16_t period_timer = 0;
+    int16_t period_timer = 0;
 
     uint8_t duty_type = 0;
     uint8_t duty_step = 0;

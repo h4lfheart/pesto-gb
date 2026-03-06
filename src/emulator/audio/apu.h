@@ -53,10 +53,10 @@ public:
     void GetSamples(float& left, float& right) const;
 
     bool ready_for_samples = false;
-    Channel3* channel3 = nullptr;
 
 private:
     void TickFrame();
+    void MixSample();
 
     uint8_t APURead(uint8_t* io, uint16_t offset);
     void APUWrite(uint8_t* io, uint16_t offset, uint8_t value);
@@ -67,6 +67,7 @@ private:
 
     Channel1* channel1 = nullptr;
     Channel2* channel2 = nullptr;
+    Channel3* channel3 = nullptr;
     Channel4* channel4 = nullptr;
 
     uint32_t sample_counter = 0;
