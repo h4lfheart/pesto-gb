@@ -28,12 +28,8 @@ public:
     virtual ~BaseChannel() = default;
     virtual void AttachMemory(Memory* mem);
 
-    virtual void TickFrame(uint8_t frame_idx);
-    virtual void Reset();
-
     uint8_t GetOutput();
     bool IsEnabled();
-    virtual bool IsDACEnabled();
 
     uint8_t output = 0;
     bool is_enabled = false;

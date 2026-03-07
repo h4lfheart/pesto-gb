@@ -16,10 +16,10 @@ class Channel4 : public BaseChannel
 {
 public:
     void Tick(uint16_t cycles);
-    void TickFrame(uint8_t frame_idx) override;
-    void Reset() override;
+    void TickFrame(uint8_t frame_idx);
+    void Reset();
     void AttachMemory(Memory* mem) override;
-    bool IsDACEnabled() override;
+    bool IsDACEnabled();
 
     void Trigger();
 
