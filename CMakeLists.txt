@@ -8,6 +8,8 @@ set(SDL_SHARED OFF)
 set(SDL_TEST OFF)
 add_subdirectory(external/SDL)
 
+add_compile_options(-O3)
+
 file(GLOB_RECURSE SOURCES
         src/*.cpp
         src/*.h
@@ -18,4 +20,5 @@ if(WIN32)
 endif()
 
 add_executable(pesto_gb ${SOURCES} ${ICON_RESOURCE})
+target_link_options(pesto_gb PRIVATE -static -static-libgcc -static-libstdc++)
 target_link_libraries(pesto_gb PRIVATE SDL2::SDL2main SDL2::SDL2-static)

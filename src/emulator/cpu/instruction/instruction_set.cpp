@@ -317,7 +317,7 @@ void ld_r16_r16_s8(CPU* cpu, InstructionRuntime* instr)
 
 void ld_r16_d16(CPU* cpu, InstructionRuntime* instr)
 {
-    cpu->reg.Write16(instr->def->op1, instr->imm.u16);
+    *cpu->reg.Reg16(instr->def->op1) = instr->imm.u16;
 }
 
 void ld_m16_r8(CPU* cpu, InstructionRuntime* instr)

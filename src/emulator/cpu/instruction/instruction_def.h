@@ -37,6 +37,4 @@ struct InstructionRuntime
     uint8_t cycles;
 
     void Execute(CPU* cpu);
-
-    static bool From(Memory* memory, uint16_t address, InstructionRuntime* runtime);
 };

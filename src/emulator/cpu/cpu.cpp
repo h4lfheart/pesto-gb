@@ -38,16 +38,42 @@ int CPU::Cycle()
     }
     else
     {
-        InstructionRuntime instr = {};
-        if (!InstructionRuntime::From(this->memory, this->reg.PC, &instr))
+        uint8_t opcode = memory->Read8(this->reg.PC++);
+
+        const bool is_prefix = __builtin_expect(opcode == 0xCB, 0);
+        if (is_prefix)
+            opcode = memory->Read8(this->reg.PC++);
+
+        const InstructionDef* instruction = is_prefix
+            ? InstructionSet::GetPrefixed(opcode)
+            : InstructionSet::Get(opcode);
+
+        if (instruction == nullptr)
         {
-            uint8_t op = this->memory->Read8(this->reg.PC);
-            fprintf(stderr, "Unknown instruction at 0x%.4X: 0x%.2X\n", this->reg.PC,
-                    op == 0xCB ? (op << 8) | this->memory->Read8(this->reg.PC + 1) : op);
+            fprintf(stderr, "Unknown instruction at 0x%.4X: 0x%.2X\n", this->reg.PC, opcode);
             exit(1);
         }
 
-        this->reg.PC += instr.def->size;
+        InstructionRuntime instr = {
+            .def = instruction,
+            .imm = {},
+            .cycles = instruction->main_cycles
+        };
+
+        if (!is_prefix)
+        {
+            if (instruction->size == 2)
+            {
+                instr.imm.u8 = memory->Read8(this->reg.PC);
+                this->reg.PC += sizeof(uint8_t);
+            }
+            else if (instruction->size == 3)
+            {
+                instr.imm.u16 = memory->Read16(this->reg.PC);
+                this->reg.PC += sizeof(uint16_t);
+            }
+        }
+
         instr.Execute(this);
         mcycles = instr.cycles;
     }
@@ -62,7 +88,15 @@ int CPU::Cycle()
     return mcycles;
 }
 
-bool CPU::TryExecuteInterrupts()
+static const struct { uint8_t mask; uint16_t addr; } interrupt_handlers[] = {
+    {INTERRUPT_VBLANK, INT_ADDR_VBLANK},
+    {INTERRUPT_STAT,   INT_ADDR_LCD_STAT},
+    {INTERRUPT_TIMER,  INT_ADDR_TIMER},
+    {INTERRUPT_SERIAL, INT_ADDR_SERIAL},
+    {INTERRUPT_JOYPAD, INT_ADDR_JOYPAD},
+};
+
+bool  CPU::TryExecuteInterrupts()
 {
     const uint8_t pending = *IE & *IF & INTERRUPT_MASK;
     if (pending == 0)
@@ -70,19 +104,7 @@ bool CPU::TryExecuteInterrupts()
 
     this->ime = false;
 
-    struct
-    {
-        uint8_t mask;
-        uint16_t addr;
-    } handlers[] = {
-            {INTERRUPT_VBLANK, INT_ADDR_VBLANK},
-            {INTERRUPT_STAT, INT_ADDR_LCD_STAT},
-            {INTERRUPT_TIMER, INT_ADDR_TIMER},
-            {INTERRUPT_SERIAL, INT_ADDR_SERIAL},
-            {INTERRUPT_JOYPAD, INT_ADDR_JOYPAD},
-        };
-
-    for (const auto& [mask, addr] : handlers)
+    for (const auto& [mask, addr] : interrupt_handlers)
     {
         if (pending & mask)
         {
@@ -95,13 +117,13 @@ bool CPU::TryExecuteInterrupts()
     return false;
 }
 
-void CPU::Push16(uint16_t value)
+void  CPU::Push16(uint16_t value)
 {
     this->reg.SP -= sizeof(uint16_t);
     this->memory->Write16(this->reg.SP, value);
 }
 
-uint16_t CPU::Pop16()
+uint16_t  CPU::Pop16()
 {
     uint16_t value = this->memory->Read16(this->reg.SP);
     this->reg.SP += sizeof(uint16_t);
@@ -109,7 +131,7 @@ uint16_t CPU::Pop16()
     return value;
 }
 
-void CPU::ExecuteInterrupt(uint16_t addr)
+void  CPU::ExecuteInterrupt(uint16_t addr)
 {
     Push16(this->reg.PC);
     this->reg.PC = addr;
