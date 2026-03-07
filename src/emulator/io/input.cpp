@@ -9,7 +9,7 @@ void Input::AttachMemory(Memory* mem)
 {
     this->memory = mem;
 
-    mem->RegisterIOMemoryRegion(IO_ADDR_JOYP, IO_ADDR_JOYP, this, &Input::ReadJOYP, &Input::WriteJOYP);
+    mem->RegisterIOHandler(IO_ADDR_JOYP, IO_ADDR_JOYP, this, &Input::ReadJOYP, &Input::WriteJOYP);
 
     this->JOYP = mem->PtrIO(IO_ADDR_JOYP);
     *JOYP = 0b00001111;

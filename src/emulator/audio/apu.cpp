@@ -84,7 +84,7 @@ void APU::AttachMemory(Memory* mem)
     this->channel3->AttachMemory(mem);
     this->channel4->AttachMemory(mem);
 
-    mem->RegisterIOMemoryRegion(0x10, 0x3F, this, &APU::APURead, &APU::APUWrite);
+    mem->RegisterIOHandler(0x10, 0x3F, this, &APU::APURead, &APU::APUWrite);
 
     NR50 = mem->PtrIO(APU_NR50_ADDR);
     NR51 = mem->PtrIO(APU_NR51_ADDR);

@@ -40,8 +40,8 @@ int CPU::Cycle()
     {
         uint8_t opcode = memory->Read8(this->reg.PC++);
 
-        const bool is_prefix = __builtin_expect(opcode == 0xCB, 0);
-        if (is_prefix)
+        const bool is_prefix = opcode == 0xCB;
+        if (is_prefix) [[unlikely]]
             opcode = memory->Read8(this->reg.PC++);
 
         const InstructionDef* instruction = is_prefix
