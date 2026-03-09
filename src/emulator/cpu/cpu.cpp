@@ -38,41 +38,45 @@ int CPU::Cycle()
     }
     else
     {
-        uint8_t opcode = memory->Read8(this->reg.PC++);
+        uint16_t addr = reg.PC;
+        uint8_t op = memory->Read8(addr++);
 
-        const bool is_prefix = opcode == 0xCB;
+        const bool is_prefix = (op == 0xCB);
+
+        const InstructionDef* instruction;
+
         if (is_prefix) [[unlikely]]
-            opcode = memory->Read8(this->reg.PC++);
-
-        const InstructionDef* instruction = is_prefix
-            ? InstructionSet::GetPrefixed(opcode)
-            : InstructionSet::Get(opcode);
-
-        if (instruction == nullptr)
         {
-            fprintf(stderr, "Unknown instruction at 0x%.4X: 0x%.2X\n", this->reg.PC, opcode);
-            exit(1);
+            op = memory->Read8(addr++);
+            instruction = InstructionSet::GetPrefixed(op);
+        }
+        else
+        {
+            instruction = InstructionSet::Get(op);
         }
 
-        InstructionRuntime instr = {
+        InstructionRuntime instr {
             .def = instruction,
-            .imm = {},
             .cycles = instruction->main_cycles
         };
 
-        if (!is_prefix)
+        if (!is_prefix) [[likely]]
         {
-            if (instruction->size == 2)
+            switch (instruction->size)
             {
-                instr.imm.u8 = memory->Read8(this->reg.PC);
-                this->reg.PC += sizeof(uint8_t);
-            }
-            else if (instruction->size == 3)
-            {
-                instr.imm.u16 = memory->Read16(this->reg.PC);
-                this->reg.PC += sizeof(uint16_t);
+            case 2:
+                instr.imm.u8 = memory->Read8(addr);
+                addr++;
+                break;
+
+            case 3:
+                instr.imm.u16 = memory->Read16(addr);
+                addr += 2;
+                break;
             }
         }
+
+        reg.PC = addr;
 
         instr.Execute(this);
         mcycles = instr.cycles;

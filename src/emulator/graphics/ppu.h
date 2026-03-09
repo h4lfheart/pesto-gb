@@ -1,6 +1,5 @@
 #pragma once
 #include "../memory/memory.h"
-#include <vector>
 
 #define SCREEN_WIDTH  160
 #define SCREEN_HEIGHT 144
@@ -14,11 +13,11 @@
 #define DOTS_HBLANK 204
 
 #define IO_ADDR_LCDC 0x40
+#define IO_ADDR_STAT 0x41
 #define IO_ADDR_SCY 0x42
 #define IO_ADDR_SCX 0x43
 #define IO_ADDR_LCDY 0x44
 #define IO_ADDR_LYC 0x45
-#define IO_ADDR_STAT 0x41
 #define IO_ADDR_BGP 0x47
 #define IO_ADDR_OBP0 0x48
 #define IO_ADDR_OBP1 0x49
@@ -41,6 +40,7 @@
 
 #define HDMA5_TYPE_MASK 0b10000000
 #define HDMA_TRANSFER_COMPLETE 0xFF
+#define HDMA_BLOCK_SIZE 0x10
 
 #define PALETTE_ADDRESS_MASK 0b00111111
 #define PALETTE_INCREMENT_MASK 0b10000000
@@ -71,6 +71,10 @@
 #define PALETTE_SIZE 8
 #define COLOR_SIZE 2
 
+#define TILE_SIZE_BYTES 16
+#define TILE_PIXEL_SIZE 8
+#define OAM_MAX_SPRITES 10
+
 #define WX_OFFSET 7
 
 #define OAM_STRUCT_SIZE 4
@@ -93,20 +97,14 @@ struct OAMObject
     uint8_t oam_index;
 };
 
-struct PPUPixel
-{
-    uint16_t color;
-    uint8_t priority_idx;
-    bool has_background_priority;
-};
-
 class PPU
 {
 public:
+    PPU();
     void Cycle(uint8_t cycles);
     void AttachMemory(Memory* mem);
 
-    uint16_t framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] = {};
+    uint16_t* framebuffer = nullptr;
     bool ready_for_draw = false;
 
 private:
@@ -120,9 +118,11 @@ private:
     void RenderScanline();
     void RenderBackground();
     void RenderWindow();
-
     void ScanOAM();
     void RenderObjects();
+
+    void RebuildBGPaletteCache(uint8_t idx);
+    void RebuildOBJPaletteCache(uint8_t idx);
 
     Memory* memory = nullptr;
 
@@ -131,22 +131,26 @@ private:
     uint8_t scanline = 0;
     uint8_t window_line = 0;
 
-    PPUPixel scanline_pixels[SCREEN_WIDTH] = {};
+    uint16_t scanline_color[SCREEN_WIDTH] = {};
+    uint8_t scanline_priority[SCREEN_WIDTH] = {};
+    uint8_t scanline_bg_priority[SCREEN_WIDTH] = {};
+    uint8_t scanline_bgp[SCREEN_WIDTH] = {};
 
-    OAMObject objects[10] = {};
+    OAMObject objects[OAM_MAX_SPRITES] = {};
     uint8_t object_count = 0;
-
-    uint8_t bgp_snapshot[SCREEN_WIDTH] = {};
 
     uint8_t background_palettes[64] = {};
     uint8_t object_palettes[64] = {};
 
-    bool is_hmda_active = false;
+    uint16_t bg_palette_cache[8][4] = {};
+    uint16_t obj_palette_cache[8][4] = {};
+
+    bool is_hdma_active = false;
     uint16_t hdma_src = 0;
     uint16_t hdma_dst = 0;
     uint16_t hdma_bytes_left = 0;
 
-    uint16_t palette[4] = {
+    uint16_t dmg_palette[4] = {
         0x6BDE,
         0x4F58,
         0x368F,
@@ -167,4 +171,5 @@ private:
     uint8_t* WY = nullptr;
     uint8_t* WX = nullptr;
     uint8_t* OPRI = nullptr;
+    uint8_t* HDMA5 = nullptr;
 };

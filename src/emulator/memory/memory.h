@@ -18,13 +18,13 @@
 #define ADDR_VRAM_END 0xA000
 
 #define ADDR_CARTRIDGE_RAM_BEGIN 0xA000
-#define ADDR_EXT_RAM_END 0xC000
+#define ADDR_CARTRIDGE_RAM_END 0xC000
 
 #define ADDR_WRAM0_BEGIN 0xC000
 #define ADDR_WRAM0_END 0xD000
 
 #define ADDR_WRAM_BANK_BEGIN 0xD000
-#define ADDR_WRAM_BANKED_END 0xE000
+#define ADDR_WRAM_BANK_END 0xE000
 
 #define ADDR_ECHO_BEGIN 0xE000
 #define ADDR_ECHO_END 0xFE00
@@ -60,9 +60,6 @@
 class CPU;
 class Memory;
 
-typedef uint8_t (*PageReadFunction)(Memory*, uint16_t);
-typedef void (*PageWriteFunction)(Memory*, uint16_t, uint8_t);
-
 typedef uint8_t (*IOReadFunction)(void* ctx, uint8_t* io, uint16_t offset);
 typedef void (*IOWriteFunction)(void* ctx, uint8_t* io, uint16_t offset, uint8_t);
 
@@ -73,6 +70,12 @@ struct IOHandler
     IOWriteFunction write = nullptr;
 };
 
+struct MemoryPageEntry
+{
+    uint8_t* read = nullptr;
+    uint8_t* write = nullptr;
+};
+
 class Memory
 {
 public:
@@ -80,8 +83,7 @@ public:
 
     void AttachCPU(CPU* cpu);
     void AttachCartridge(Cartridge* cart);
-
-    void LoadBootRom(const char* boot_rom_path);
+    void LoadBootRom(char* boot_rom_path);
 
     template <class T>
     void RegisterIOHandler(uint8_t start, uint8_t end, T* obj,
@@ -90,17 +92,34 @@ public:
 
     void SetInterruptFlag(uint8_t flag);
 
-    uint8_t Read8(uint16_t address);
-    void Write8(uint16_t address, uint8_t value);
+    uint8_t Read8(uint16_t address) __attribute__((always_inline))
+    {
+        const MemoryPageEntry& p = page_table[address >> 8];
+        if (__builtin_expect(p.read != nullptr, 1))
+            return p.read[address & 0xFF];
+
+        return FallbackRead(address);
+    }
+
+    void Write8(uint16_t address, uint8_t value) __attribute__((always_inline))
+    {
+        const MemoryPageEntry& p = page_table[address >> 8];
+        if (__builtin_expect(p.write != nullptr, 1))
+        {
+            p.write[address & 0xFF] = value;
+            return;
+        }
+
+        FallbackWrite(address, value);
+    }
 
     uint16_t Read16(uint16_t address);
     void Write16(uint16_t address, uint16_t value);
 
-    uint8_t ReadIO(uint8_t offset);
-    void WriteIO(uint8_t offset, uint8_t value);
-    uint8_t* PtrIO(const uint8_t offset) { return &io[offset]; }
+    uint8_t ReadIO(uint16_t offset);
+    void WriteIO(uint16_t offset, uint8_t value);
+    uint8_t* PtrIO(uint8_t offset) { return &this->io[offset]; }
 
-    // ppu access functions
     uint8_t ReadVRAMBank(bool use_extra_bank, uint16_t offset);
     void WriteVRAM(uint16_t offset, uint8_t value);
     uint8_t* VRAMPtr(bool use_extra_bank);
@@ -108,8 +127,16 @@ public:
 
     bool IsCGB() const;
 
+    void RebuildPageTable();
+
     uint8_t ie = 0;
     Cartridge* cartridge = nullptr;
+
+private:
+    uint8_t FallbackRead(uint16_t address);
+    void FallbackWrite(uint16_t address, uint8_t value);
+
+    CPU* cpu = nullptr;
 
     uint8_t wram_bank = 1;
     uint8_t wram0[GB_WRAM_SIZE] = {};
@@ -127,48 +154,28 @@ public:
     bool uses_cgb_bootrom = false;
     uint8_t boot_rom[GB_CGB_BOOT_ROM_SIZE] = {};
 
-private:
-    CPU* cpu = nullptr;
-
     IOHandler io_lut[GB_IO_SIZE] = {};
-
-    PageReadFunction read_lut[256] = {};
-    PageWriteFunction write_lut[256] = {};
+    MemoryPageEntry page_table[256] = {};
 };
 
-
 template <class T>
-void Memory::RegisterIOHandler(
-    const uint8_t start, const uint8_t end, T* obj,
+void Memory::RegisterIOHandler(uint8_t start, uint8_t end, T* obj,
     uint8_t (T::*read_func)(uint8_t*, uint16_t),
     void (T::*write_func)(uint8_t*, uint16_t, uint8_t))
 {
-    struct Context
-    {
-        T* obj;
-        uint8_t (T::*read)(uint8_t*, uint16_t);
-        void (T::*write)(uint8_t*, uint16_t, uint8_t);
-    };
+    static uint8_t (T::*inst_read)(uint8_t*, uint16_t) = read_func;
+    static void (T::*inst_write)(uint8_t*, uint16_t, uint8_t) = write_func;
 
     for (uint8_t i = start; i <= end; i++)
     {
-        if (io_lut[i].ctx)
-            delete static_cast<Context*>(io_lut[i].ctx);
-
-        auto* context = new Context{ obj, read_func, write_func };
-
-        io_lut[i].ctx = context;
-
-        io_lut[i].read = [](void* ctx, uint8_t* io, uint16_t offset) -> uint8_t
-        {
-            auto* trampoline = static_cast<Context*>(ctx);
-            return (trampoline->obj->*trampoline->read)(io, offset);
-        };
-
-        io_lut[i].write = [](void* ctx, uint8_t* io, uint16_t offset, uint8_t value)
-        {
-            auto* trampoline = static_cast<Context*>(ctx);
-            (trampoline->obj->*trampoline->write)(io, offset, value);
+        io_lut[i] = {
+            .ctx = obj,
+            .read = [](void* ctx, uint8_t* io, uint16_t off) {
+                return (static_cast<T*>(ctx)->*inst_read)(io, off);
+            },
+            .write = [](void* ctx, uint8_t* io, uint16_t off, uint8_t val) {
+                (static_cast<T*>(ctx)->*inst_write)(io, off, val);
+            }
         };
     }
 }

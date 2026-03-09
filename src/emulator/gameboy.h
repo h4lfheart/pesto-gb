@@ -31,6 +31,8 @@ public:
     void WriteSave(const char* path);
 
     void SetSpeedup(bool speedup);
+    PPU* ppu;
+    APU* apu;
 
     DrawFunction OnDrawFunction;
     AudioFunction OnAudioFunction;
@@ -39,10 +41,8 @@ private:
     CPU* cpu;
     Memory* memory;
     Cartridge* cartridge;
-    PPU* ppu;
     Input* input;
     Timer* timer;
-    APU* apu;
 
     bool is_running = false;
     bool is_speedup = false;

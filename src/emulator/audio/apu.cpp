@@ -42,20 +42,20 @@ void APU::MixSample()
 {
     const uint8_t vol = *NR50;
     const uint8_t panning = *NR51;
-    const uint8_t left_volume = (vol & APU_NR50_LEFT_VOLUME_MASK) >> 4;
-    const uint8_t right_volume = (vol & APU_NR50_RIGHT_VOLUME_MASK);
+    const float left_volume = static_cast<float>((vol & APU_NR50_LEFT_VOLUME_MASK) >> 4);
+    const float right_volume = static_cast<float>(vol & APU_NR50_RIGHT_VOLUME_MASK);
 
     const float ch1 = channel1->IsDACEnabled()
-                          ? (static_cast<float>(channel1->output) - channel1->volume * 0.5f) / APU_MAX_VOLUME
+                          ? (static_cast<float>(channel1->output) - channel1->volume * 0.5f) * INV_MAX_VOLUME
                           : 0.0f;
     const float ch2 = channel2->IsDACEnabled()
-                          ? (static_cast<float>(channel2->output) - channel2->volume * 0.5f) / APU_MAX_VOLUME
+                          ? (static_cast<float>(channel2->output) - channel2->volume * 0.5f) * INV_MAX_VOLUME
                           : 0.0f;
     const float ch3 = channel3->IsDACEnabled()
-                          ? (static_cast<float>(channel3->output) - channel3->dc_offset) / APU_MAX_VOLUME
+                          ? (static_cast<float>(channel3->output) - channel3->dc_offset) * INV_MAX_VOLUME
                           : 0.0f;
     const float ch4 = channel4->IsDACEnabled()
-                          ? (static_cast<float>(channel4->output) - channel4->volume * 0.5f) / APU_MAX_VOLUME
+                          ? (static_cast<float>(channel4->output) - channel4->volume * 0.5f) * INV_MAX_VOLUME
                           : 0.0f;
 
     float left = 0.0f, right = 0.0f;
@@ -68,8 +68,8 @@ void APU::MixSample()
     if (panning & APU_NR51_CH4_LEFT_MASK) left += ch4;
     if (panning & APU_NR51_CH4_RIGHT_MASK) right += ch4;
 
-    left = left / APU_CHANNEL_COUNT * static_cast<float>(left_volume) / APU_VOLUME_DIVISOR;
-    right = right / APU_CHANNEL_COUNT * static_cast<float>(right_volume) / APU_VOLUME_DIVISOR;
+    left = left * INV_CHANNEL_COUNT * left_volume * INV_VOLUME_DIVISOR;
+    right = right * INV_CHANNEL_COUNT * right_volume * INV_VOLUME_DIVISOR;
 
     this->sample_left = left < -1.0f ? -1.0f : (left > 1.0f ? 1.0f : left);
     this->sample_right = right < -1.0f ? -1.0f : (right > 1.0f ? 1.0f : right);

@@ -92,13 +92,27 @@ struct Registers
         reg16_lut[static_cast<int>(RegisterType::REG_SP)] = &SP;
     }
 
-    uint8_t* Reg8(RegisterType reg) const;
+    uint8_t* Reg8(RegisterType reg) const
+    {
+        return reg8_lut[static_cast<int>(reg)];
+    }
 
-    uint16_t* Reg16(RegisterType reg) const;
+    uint16_t* Reg16(RegisterType reg) const
+    {
+        return reg16_lut[static_cast<int>(reg)];
+    }
 
-    void SetFlag(FlagType flag, uint8_t value);
+    void SetFlag(FlagType flag, uint8_t value)
+    {
+        const uint8_t mask = FLAG_MASKS[static_cast<int>(flag)];
+        if (value) F |= mask;
+        else F &= ~mask;
+    }
 
-    bool GetFlag(FlagType flag) const;
+    bool GetFlag(FlagType flag) const
+    {
+        return (F & FLAG_MASKS[static_cast<int>(flag)]) != 0;
+    }
 
 private:
     uint8_t* reg8_lut[static_cast<int>(RegisterType::REG_MAX)] = {};
