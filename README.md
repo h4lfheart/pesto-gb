@@ -2,8 +2,8 @@
 
 pesto-gb - An original Game Boy Color Emulator for the ESP32
 ------------------------------------------
-[![Release](https://img.shields.io/github/release/h4lfheart/pesto-gb)]()
-[![Downloads](https://img.shields.io/github/downloads/h4lfheart/pesto-gb/total?color=green)]()
+[![Release](https://img.shields.io/github/release/h4lfheart/pesto-gb?color=green)]()
+[![Downloads](https://img.shields.io/github/downloads/h4lfheart/pesto-gb/total?color=yellowgreen)]()
 
 ![cover](.github/cover.gif)
 
