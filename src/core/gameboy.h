@@ -47,8 +47,11 @@ public:
     void WriteSave(const char* path);
 
     void SetSpeedup(bool speedup);
+
+    // TODO add wrapper functions for accessing properties in these components
     PPU* ppu;
     APU* apu;
+    Cartridge* cartridge;
 
     DrawFunction OnDrawFunction;
     AudioFunction OnAudioFunction;
@@ -56,7 +59,6 @@ public:
 private:
     CPU* cpu;
     Memory* memory;
-    Cartridge* cartridge;
     Input* input;
     Timer* timer;
 

@@ -92,19 +92,19 @@ public:
 
     void SetInterruptFlag(uint8_t flag);
 
-    uint8_t Read8(uint16_t address) __attribute__((always_inline))
+    uint8_t Read8(uint16_t address)
     {
         const MemoryPageEntry& p = page_table[address >> 8];
-        if (__builtin_expect(p.read != nullptr, 1))
+        if (p.read != nullptr)
             return p.read[address & 0xFF];
 
         return FallbackRead(address);
     }
 
-    void Write8(uint16_t address, uint8_t value) __attribute__((always_inline))
+    void Write8(uint16_t address, uint8_t value)
     {
         const MemoryPageEntry& p = page_table[address >> 8];
-        if (__builtin_expect(p.write != nullptr, 1))
+        if (p.write != nullptr)
         {
             p.write[address & 0xFF] = value;
             return;

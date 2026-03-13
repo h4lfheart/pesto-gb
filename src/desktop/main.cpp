@@ -18,11 +18,10 @@ int main(int argc, char** argv)
 
     arguments.add_argument("--dmg-bootrom")
         .help("The path for your gameboy boot rom file.")
-        .default_value("dmg_boot.bin");
+        .required();
 
     arguments.add_argument("--cgb-bootrom")
-        .help("The path for your gameboy color boot rom file.")
-        .default_value("cgb_boot.bin");
+        .help("The path for your gameboy color boot rom file.");
 
     try {
         arguments.parse_args(argc, argv);
@@ -40,14 +39,14 @@ int main(int argc, char** argv)
 
     GameBoy game_boy(rom_path);
 
-    if (game_boy.IsCGBGame())
+    if (auto cgb_boot_path = arguments.present<std::string>("--cgb-bootrom");
+        cgb_boot_path.has_value() &&game_boy.IsCGBGame())
     {
-        auto cgb_boot_path = arguments.get<std::string>("cgb-bootrom");
-        game_boy.LoadBootRom(cgb_boot_path);
+        game_boy.LoadBootRom(*cgb_boot_path);
     }
     else
     {
-        auto dmg_boot_path = arguments.get<std::string>("dmg-bootrom");
+        auto dmg_boot_path = arguments.get<std::string>("--dmg-bootrom");
         game_boy.LoadBootRom(dmg_boot_path);
     }
 

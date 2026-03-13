@@ -1,2 +1,9 @@
+# clion
 .idea
+
+# don't wanna get in trouble
 roms
+
+# build
+build
+cmake-build-debug

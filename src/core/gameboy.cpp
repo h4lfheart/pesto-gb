@@ -30,15 +30,13 @@ GameBoy::GameBoy(const std::string& rom_path, GameBoySettings settings)
     this->timer->AttachMemory(this->memory);
     this->apu->AttachMemory(this->memory);
 
-    printf("Title: %s\n", this->cartridge->GetTitle());
-    printf("Type: %s\n", this->cartridge->GetCartridgeType());
-
     this->is_running = true;
 }
 
+// TODO breakout to TickFrame for device-agnostic handling
 void GameBoy::Run()
 {
-    const int64_t FRAME_BUDGET_NS = (int64_t)(1'000'000'000.0 / FRAMES_PER_SECOND);
+    const int64_t FRAME_BUDGET_NS = static_cast<int64_t>(1'000'000'000.0 / FRAMES_PER_SECOND);
     int64_t frame_start = now_ns();
 
     while (this->is_running)
