@@ -17,14 +17,13 @@ To build pesto-gb from source, first clone the repository and all of its submodu
 git clone https://github.com/h4lfheart/pesto-gb --recursive
 ```
 
-Then configure the project and build with CMake, ensuring you're using a compiler with C++23 support.
+Then run the build script at the root of the repository. Please ensure you have a compiler installed with C++23 support.
 
 ```
-cmake -B build
-cmake --build build --config Release
+./build.sh
 ```
 
-The output binary will be located in `./build/release/`.
+The output binary will be located in `./release/`.
 
 
 ## Usage
