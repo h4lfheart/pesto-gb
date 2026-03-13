@@ -34,14 +34,24 @@ public:
     CPU();
 
     void AttachMemory(Memory* mem);
+
     int Cycle();
-    bool TryExecuteInterrupts();
+    int ExecuteInstruction();
+    bool TryExecuteInterrupts(uint8_t interrupt_pending);
 
     void Push16(uint16_t value);
     uint16_t Pop16();
 
     Registers reg = {};
     uint64_t cycles = 0;
+
+    union {
+        uint16_t u16;
+        uint8_t  u8;
+        int8_t   s8;
+    } imm = {};
+
+    uint8_t exec_cycles = 0;
 
     bool stop = false;
     bool halt = false;
