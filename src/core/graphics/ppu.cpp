@@ -1,14 +1,21 @@
 #include "ppu.h"
 #include <cstring>
 #include <algorithm>
+#include <array>
 
 #include "../cpu/cpu.h"
 
 static uint16_t tile_pixel_lut[256];
 static uint16_t tile_pixel_lut_flipped[256];
 
-PPU::PPU()
+PPU::PPU(uint16_t* framebuffer, std::array<uint16_t, 4> palette)
 {
+    this->framebuffer = framebuffer != nullptr
+        ? framebuffer
+        : static_cast<uint16_t*>(malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint16_t)));
+
+    this->dmg_palette = palette;
+
     // build tile pixel lut
     for (int b = 0; b < 256; b++)
     {
@@ -23,8 +30,6 @@ PPU::PPU()
         tile_pixel_lut[b] = forward;
         tile_pixel_lut_flipped[b] = reverse;
     }
-
-    this->framebuffer = static_cast<uint16_t*>(malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint16_t)));
 }
 
 void PPU::RebuildBGPaletteCache(uint8_t idx)
@@ -67,27 +72,16 @@ void PPU::Cycle(uint8_t cycles)
             this->dots -= DOTS_OAM;
             this->ScanOAM();
             this->SetMode(PPUMode::MODE_DRAW);
+            this->bgp_event_count = 0;
         }
         break;
 
     case PPUMode::MODE_DRAW:
-        if (!is_cgb)
-        {
-            const int batch_start = this->dots - cycles;
-            for (int t = 0; t < cycles; t++)
-            {
-                const int pixel_col = batch_start + t - 1;
-                if (pixel_col >= 0 && pixel_col < SCREEN_WIDTH)
-                    this->scanline_bgp[pixel_col] = *BGP;
-            }
-        }
-
         if (this->dots >= DOTS_DRAW)
         {
             this->dots -= DOTS_DRAW;
             this->RenderScanline();
             this->SetMode(PPUMode::MODE_HBLANK);
-
             if (*STAT & STAT_HBLANK_INT)
                 this->memory->SetInterruptFlag(INTERRUPT_STAT);
         }
@@ -161,6 +155,7 @@ void PPU::AttachMemory(Memory* mem)
 {
     this->memory = mem;
 
+    mem->RegisterIOHandler(0x47, 0x47, this, &PPU::PPURead, &PPU::PPUWrite);
     mem->RegisterIOHandler(0x68, 0x6B, this, &PPU::PPURead, &PPU::PPUWrite);
     mem->RegisterIOHandler(0x51, 0x55, this, &PPU::PPURead, &PPU::PPUWrite);
 
@@ -178,7 +173,7 @@ void PPU::AttachMemory(Memory* mem)
     OPRI = mem->PtrIO(IO_ADDR_OPRI);
     HDMA5 = mem->PtrIO(IO_ADDR_HDMA5);
 
-    is_cgb = mem->IsCGB();
+    use_cgb_rendering = mem->IsCGB();
 }
 
 uint8_t PPU::PPURead(uint8_t* io, uint16_t offset)
@@ -188,13 +183,11 @@ uint8_t PPU::PPURead(uint8_t* io, uint16_t offset)
         const uint8_t idx = io[IO_ADDR_BCPS] & PALETTE_ADDRESS_MASK;
         return this->background_palettes[idx];
     }
-
     if (offset == IO_ADDR_OCPD)
     {
         const uint8_t idx = io[IO_ADDR_OCPS] & PALETTE_ADDRESS_MASK;
         return this->object_palettes[idx];
     }
-
     if (offset == IO_ADDR_HDMA5)
         return this->is_hdma_active ? (this->hdma_bytes_left / HDMA_BLOCK_SIZE) - 1 : HDMA_TRANSFER_COMPLETE;
 
@@ -205,13 +198,20 @@ void PPU::PPUWrite(uint8_t* io, uint16_t offset, uint8_t value)
 {
     io[offset] = value;
 
+    if (offset == IO_ADDR_BGP && !use_cgb_rendering)
+    {
+        if (this->mode == PPUMode::MODE_DRAW && this->bgp_event_count < SCREEN_WIDTH)
+        {
+            const uint8_t dot = static_cast<uint8_t>(std::clamp<int>(this->dots - 7, 0, DOTS_DRAW - 1));
+            this->bgp_events[this->bgp_event_count++] = {dot, value};
+        }
+    }
+
     if (offset == IO_ADDR_BCPD)
     {
         const uint8_t idx = io[IO_ADDR_BCPS] & PALETTE_ADDRESS_MASK;
         this->background_palettes[idx] = value;
-
         RebuildBGPaletteCache(idx);
-
         if (io[IO_ADDR_BCPS] & PALETTE_INCREMENT_MASK)
             io[IO_ADDR_BCPS] = (io[IO_ADDR_BCPS] & PALETTE_INCREMENT_MASK) | ((idx + 1) & PALETTE_ADDRESS_MASK);
     }
@@ -220,9 +220,7 @@ void PPU::PPUWrite(uint8_t* io, uint16_t offset, uint8_t value)
     {
         const uint8_t idx = io[IO_ADDR_OCPS] & PALETTE_ADDRESS_MASK;
         this->object_palettes[idx] = value;
-
         RebuildOBJPaletteCache(idx);
-
         if (io[IO_ADDR_OCPS] & PALETTE_INCREMENT_MASK)
             io[IO_ADDR_OCPS] = (io[IO_ADDR_OCPS] & PALETTE_INCREMENT_MASK) | ((idx + 1) & PALETTE_ADDRESS_MASK);
     }
@@ -241,10 +239,8 @@ void PPU::PPUWrite(uint8_t* io, uint16_t offset, uint8_t value)
                 io[IO_ADDR_HDMA5] = HDMA_TRANSFER_COMPLETE;
                 return;
             }
-
             for (uint16_t i = 0; i < len; i++)
                 this->memory->WriteVRAM(dst + i, this->memory->Read8(src + i));
-
             io[IO_ADDR_HDMA5] = HDMA_TRANSFER_COMPLETE;
         }
         else
@@ -290,23 +286,35 @@ void PPU::CheckLYC() const
 
 void PPU::RenderScanline()
 {
-    memset(this->scanline_color, 0, sizeof(uint16_t) * SCREEN_WIDTH);
-    memset(this->scanline_priority, 0, sizeof(uint8_t) * SCREEN_WIDTH);
-    memset(this->scanline_bg_priority, 0, sizeof(uint8_t) * SCREEN_WIDTH);
-
-    RenderBackground();
-    RenderWindow();
-    RenderObjects();
-
     uint16_t* row = this->framebuffer + this->scanline * SCREEN_WIDTH;
-    memcpy(row, this->scanline_color, sizeof(uint16_t) * SCREEN_WIDTH);
+
+    memset(this->scanline_priority, 0, SCREEN_WIDTH);
+    memset(this->scanline_bg_priority, 0, SCREEN_WIDTH);
+
+    if (!use_cgb_rendering && this->bgp_event_count > 0)
+    {
+        memset(this->scanline_bgp, *BGP, SCREEN_WIDTH);
+        for (int i = 0; i < this->bgp_event_count; i++)
+        {
+            const int from = std::clamp<int>(this->bgp_events[i].dot - 1, 0, SCREEN_WIDTH);
+            const int to = (i + 1 < this->bgp_event_count)
+                               ? std::clamp<int>(this->bgp_events[i + 1].dot - 1, 0, SCREEN_WIDTH)
+                               : SCREEN_WIDTH;
+            if (from < to)
+                memset(this->scanline_bgp + from, this->bgp_events[i].bgp, to - from);
+        }
+    }
+
+    RenderBackground(row);
+    RenderWindow(row);
+    RenderObjects(row);
 }
 
-void PPU::RenderBackground()
+void PPU::RenderBackground(uint16_t* row)
 {
     const uint8_t lcdc = *LCDC;
 
-    if ((lcdc & LCDC_BG_ENABLE) == 0 && !is_cgb)
+    if ((lcdc & LCDC_BG_ENABLE) == 0 && !use_cgb_rendering)
         return;
 
     const uint8_t scy = *SCY;
@@ -320,16 +328,16 @@ void PPU::RenderBackground()
     const uint8_t tile_y = py >> 3;
     const uint8_t pixel_y = py & 7;
 
-    const uint8_t* __restrict__ vram0 = memory->VRAMPtr(false);
-    const uint8_t* __restrict__ vram1 = memory->VRAMPtr(true);
+    const uint8_t* vram0 = memory->VRAMPtr(false);
+    const uint8_t* vram1 = memory->VRAMPtr(true);
 
     uint8_t tile_x = (scx >> 3) & 0x1F;
     uint8_t pixel_x = scx & 7;
     int screen_x = 0;
 
-    if (is_cgb)
+    if (use_cgb_rendering)
     {
-        auto render_tile_cgb = [&](uint8_t tx, int sx, int pstart, int count)
+        auto render_tile = [&](uint8_t tx, int sx, int pstart, int count)
         {
             const uint16_t map_off = tile_map_base + (tile_y * 32) + tx;
             const uint8_t tile_idx = vram0[map_off];
@@ -342,20 +350,20 @@ void PPU::RenderBackground()
 
             const uint8_t real_py = flip_y ? (7 - pixel_y) : pixel_y;
             const uint16_t tile_addr = tile_data_base +
-                (signed_tiles ? static_cast<int8_t>(tile_idx) : tile_idx) * TILE_SIZE_BYTES;
+                (signed_tiles ? (int16_t)(int8_t)tile_idx : (int16_t)tile_idx) * TILE_SIZE_BYTES;
 
-            const uint8_t* __restrict__ vsrc = use_bank1 ? vram1 : vram0;
+            const uint8_t* vsrc = use_bank1 ? vram1 : vram0;
             const uint8_t td1 = vsrc[tile_addr + real_py * 2];
             const uint8_t td2 = vsrc[tile_addr + real_py * 2 + 1];
 
-            const uint16_t* __restrict__ lut = flip_x ? tile_pixel_lut_flipped : tile_pixel_lut;
-            const uint16_t* __restrict__ pal = bg_palette_cache[tile_attr & OBJ_CGB_PALETTE_MASK];
+            const uint16_t* lut = flip_x ? tile_pixel_lut_flipped : tile_pixel_lut;
+            const uint16_t* pal = bg_palette_cache[tile_attr & OBJ_CGB_PALETTE_MASK];
 
             uint16_t td = (lut[td1] | (lut[td2] << 1)) >> (pstart * 2);
             for (int i = 0; i < count; i++, td >>= 2)
             {
                 const uint8_t ci = td & 3;
-                scanline_color[sx + i] = pal[ci];
+                row[sx + i] = pal[ci];
                 scanline_priority[sx + i] = ci;
                 scanline_bg_priority[sx + i] = has_bg_pri;
             }
@@ -364,67 +372,111 @@ void PPU::RenderBackground()
         if (pixel_x != 0)
         {
             const int count = std::min((int)(TILE_PIXEL_SIZE - pixel_x), SCREEN_WIDTH);
-            render_tile_cgb(tile_x, screen_x, pixel_x, count);
+            render_tile(tile_x, screen_x, pixel_x, count);
             screen_x += count;
             tile_x = (tile_x + 1) & 0x1F;
         }
+
         while (screen_x <= SCREEN_WIDTH - TILE_PIXEL_SIZE)
         {
-            render_tile_cgb(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
+            render_tile(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
             screen_x += TILE_PIXEL_SIZE;
             tile_x = (tile_x + 1) & 0x1F;
         }
 
         if (screen_x < SCREEN_WIDTH)
-            render_tile_cgb(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
+            render_tile(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
     }
     else
     {
-        auto render_tile_dmg = [&](uint8_t tx, int sx, int pstart, int count)
+        const uint8_t current_bgp = *BGP;
+        const bool use_bgp_snapshot = (this->bgp_event_count > 0);
+
+        if (use_bgp_snapshot)
         {
-            const uint16_t map_off = tile_map_base + (tile_y * 32) + tx;
-            const uint8_t tile_idx = vram0[map_off];
-
-            const uint16_t tile_addr = tile_data_base +
-                (signed_tiles ? static_cast<int8_t>(tile_idx) : tile_idx) * TILE_SIZE_BYTES;
-
-            const uint8_t td1 = vram0[tile_addr + pixel_y * 2];
-            const uint8_t td2 = vram0[tile_addr + pixel_y * 2 + 1];
-
-            uint16_t td = (tile_pixel_lut[td1] | (tile_pixel_lut[td2] << 1)) >> (pstart * 2);
-            for (int i = 0; i < count; i++, td >>= 2)
+            auto render_tile = [&](uint8_t tx, int sx, int pstart, int count)
             {
-                const uint8_t ci = td & 3;
-                scanline_color[sx + i] = dmg_palette[(scanline_bgp[sx + i] >> (ci << 1)) & 3];
-                scanline_priority[sx + i] = ci;
-                scanline_bg_priority[sx + i] = 0;
+                const uint16_t map_off = tile_map_base + (tile_y * 32) + tx;
+                const uint8_t tile_idx = vram0[map_off];
+                const uint16_t tile_addr = tile_data_base +
+                    (signed_tiles ? (int16_t)(int8_t)tile_idx : (int16_t)tile_idx) * TILE_SIZE_BYTES;
+
+                const uint8_t td1 = vram0[tile_addr + pixel_y * 2];
+                const uint8_t td2 = vram0[tile_addr + pixel_y * 2 + 1];
+                uint16_t td = (tile_pixel_lut[td1] | (tile_pixel_lut[td2] << 1)) >> (pstart * 2);
+
+                for (int i = 0; i < count; i++, td >>= 2)
+                {
+                    const uint8_t ci = td & 3;
+                    row[sx + i] = dmg_palette[(scanline_bgp[sx + i] >> (ci << 1)) & 3];
+                    scanline_priority[sx + i] = ci;
+                }
+            };
+
+            if (pixel_x != 0)
+            {
+                const int count = std::min((int)(TILE_PIXEL_SIZE - pixel_x), SCREEN_WIDTH);
+                render_tile(tile_x, screen_x, pixel_x, count);
+                screen_x += count;
+                tile_x = (tile_x + 1) & 0x1F;
             }
-        };
 
-        if (pixel_x != 0)
-        {
-            const int count = std::min((int)(TILE_PIXEL_SIZE - pixel_x), SCREEN_WIDTH);
-            render_tile_dmg(tile_x, screen_x, pixel_x, count);
-            screen_x += count;
-            tile_x = (tile_x + 1) & 0x1F;
+            while (screen_x <= SCREEN_WIDTH - TILE_PIXEL_SIZE)
+            {
+                render_tile(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
+                screen_x += TILE_PIXEL_SIZE;
+                tile_x = (tile_x + 1) & 0x1F;
+            }
+
+            if (screen_x < SCREEN_WIDTH)
+                render_tile(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
         }
-
-        while (screen_x <= SCREEN_WIDTH - TILE_PIXEL_SIZE)
+        else
         {
-            render_tile_dmg(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
-            screen_x += TILE_PIXEL_SIZE;
-            tile_x = (tile_x + 1) & 0x1F;
-        }
+            auto render_tile = [&](uint8_t tx, int sx, int pstart, int count)
+            {
+                const uint16_t map_off = tile_map_base + (tile_y * 32) + tx;
+                const uint8_t tile_idx = vram0[map_off];
+                const uint16_t tile_addr = tile_data_base +
+                    (signed_tiles ? (int16_t)(int8_t)tile_idx : (int16_t)tile_idx) * TILE_SIZE_BYTES;
 
-        if (screen_x < SCREEN_WIDTH)
-            render_tile_dmg(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
+                const uint8_t td1 = vram0[tile_addr + pixel_y * 2];
+                const uint8_t td2 = vram0[tile_addr + pixel_y * 2 + 1];
+                uint16_t td = (tile_pixel_lut[td1] | (tile_pixel_lut[td2] << 1)) >> (pstart * 2);
+
+                for (int i = 0; i < count; i++, td >>= 2)
+                {
+                    const uint8_t ci = td & 3;
+                    row[sx + i] = dmg_palette[(current_bgp >> (ci << 1)) & 3];
+                    scanline_priority[sx + i] = ci;
+                }
+            };
+
+            if (pixel_x != 0)
+            {
+                const int count = std::min((int)(TILE_PIXEL_SIZE - pixel_x), SCREEN_WIDTH);
+                render_tile(tile_x, screen_x, pixel_x, count);
+                screen_x += count;
+                tile_x = (tile_x + 1) & 0x1F;
+            }
+
+            while (screen_x <= SCREEN_WIDTH - TILE_PIXEL_SIZE)
+            {
+                render_tile(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
+                screen_x += TILE_PIXEL_SIZE;
+                tile_x = (tile_x + 1) & 0x1F;
+            }
+
+            if (screen_x < SCREEN_WIDTH)
+                render_tile(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
+        }
     }
 }
 
-void PPU::RenderWindow()
+void PPU::RenderWindow(uint16_t* row)
 {
     const uint8_t lcdc = *LCDC;
-    if (!(lcdc & LCDC_WINDOW_ENABLE) || (!(lcdc & LCDC_BG_ENABLE) && !is_cgb))
+    if (!(lcdc & LCDC_WINDOW_ENABLE) || (!(lcdc & LCDC_BG_ENABLE) && !use_cgb_rendering))
         return;
 
     const uint8_t wy = *WY;
@@ -441,8 +493,8 @@ void PPU::RenderWindow()
     const uint16_t tile_data_base = (lcdc & LCDC_TILE_DATA) ? 0x0000 : 0x1000;
     const bool signed_tiles = !(lcdc & LCDC_TILE_DATA);
 
-    const uint8_t* __restrict__ vram0 = memory->VRAMPtr(false);
-    const uint8_t* __restrict__ vram1 = memory->VRAMPtr(true);
+    const uint8_t* vram0 = memory->VRAMPtr(false);
+    const uint8_t* vram1 = memory->VRAMPtr(true);
 
     const uint8_t py = this->window_line;
     const uint8_t tile_y = py >> 3;
@@ -451,9 +503,9 @@ void PPU::RenderWindow()
     int screen_x = start_x;
     uint8_t tile_x = 0;
 
-    if (is_cgb)
+    if (use_cgb_rendering)
     {
-        auto render_tile_cgb = [&](uint8_t tx, int sx, int pstart, int count)
+        auto render_tile = [&](uint8_t tx, int sx, int pstart, int count)
         {
             const uint16_t map_off = tile_map_base + (tile_y * 32) + tx;
             const uint8_t tile_idx = vram0[map_off];
@@ -466,20 +518,20 @@ void PPU::RenderWindow()
 
             const uint8_t real_py = flip_y ? (7 - pixel_y) : pixel_y;
             const uint16_t tile_addr = tile_data_base +
-                (signed_tiles ? static_cast<int8_t>(tile_idx) : tile_idx) * TILE_SIZE_BYTES;
+                (signed_tiles ? (int16_t)(int8_t)tile_idx : (int16_t)tile_idx) * TILE_SIZE_BYTES;
 
-            const uint8_t* __restrict__ vsrc = use_bank1 ? vram1 : vram0;
+            const uint8_t* vsrc = use_bank1 ? vram1 : vram0;
             const uint8_t td1 = vsrc[tile_addr + real_py * 2];
             const uint8_t td2 = vsrc[tile_addr + real_py * 2 + 1];
 
-            const uint16_t* __restrict__ lut = flip_x ? tile_pixel_lut_flipped : tile_pixel_lut;
-            const uint16_t* __restrict__ pal = bg_palette_cache[tile_attr & OBJ_CGB_PALETTE_MASK];
+            const uint16_t* lut = flip_x ? tile_pixel_lut_flipped : tile_pixel_lut;
+            const uint16_t* pal = bg_palette_cache[tile_attr & OBJ_CGB_PALETTE_MASK];
 
             uint16_t td = (lut[td1] | (lut[td2] << 1)) >> (pstart * 2);
             for (int i = 0; i < count; i++, td >>= 2)
             {
                 const uint8_t ci = td & 3;
-                scanline_color[sx + i] = pal[ci];
+                row[sx + i] = pal[ci];
                 scanline_priority[sx + i] = ci;
                 scanline_bg_priority[sx + i] = has_bg_pri;
             }
@@ -487,45 +539,44 @@ void PPU::RenderWindow()
 
         while (screen_x <= SCREEN_WIDTH - TILE_PIXEL_SIZE)
         {
-            render_tile_cgb(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
+            render_tile(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
             screen_x += TILE_PIXEL_SIZE;
             tile_x++;
         }
+
         if (screen_x < SCREEN_WIDTH)
-            render_tile_cgb(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
+            render_tile(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
     }
     else
     {
-        auto render_tile_dmg = [&](uint8_t tx, int sx, int pstart, int count)
+        auto render_tile = [&](uint8_t tx, int sx, int pstart, int count)
         {
             const uint16_t map_off = tile_map_base + (tile_y * 32) + tx;
             const uint8_t tile_idx = vram0[map_off];
-
             const uint16_t tile_addr = tile_data_base +
-                (signed_tiles ? static_cast<int8_t>(tile_idx) : tile_idx) * TILE_SIZE_BYTES;
+                (signed_tiles ? (int16_t)(int8_t)tile_idx : (int16_t)tile_idx) * TILE_SIZE_BYTES;
 
-            const uint8_t* __restrict__ vsrc = vram0;
-            const uint8_t td1 = vsrc[tile_addr + pixel_y * 2];
-            const uint8_t td2 = vsrc[tile_addr + pixel_y * 2 + 1];
-
+            const uint8_t td1 = vram0[tile_addr + pixel_y * 2];
+            const uint8_t td2 = vram0[tile_addr + pixel_y * 2 + 1];
             uint16_t td = (tile_pixel_lut[td1] | (tile_pixel_lut[td2] << 1)) >> (pstart * 2);
+
             for (int i = 0; i < count; i++, td >>= 2)
             {
                 const uint8_t ci = td & 3;
-                scanline_color[sx + i] = dmg_palette[(scanline_bgp[sx + i] >> (ci << 1)) & 3];
+                row[sx + i] = dmg_palette[(scanline_bgp[sx + i] >> (ci << 1)) & 3];
                 scanline_priority[sx + i] = ci;
-                scanline_bg_priority[sx + i] = 0;
             }
         };
 
         while (screen_x <= SCREEN_WIDTH - TILE_PIXEL_SIZE)
         {
-            render_tile_dmg(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
+            render_tile(tile_x, screen_x, 0, TILE_PIXEL_SIZE);
             screen_x += TILE_PIXEL_SIZE;
             tile_x++;
         }
+
         if (screen_x < SCREEN_WIDTH)
-            render_tile_dmg(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
+            render_tile(tile_x, screen_x, 0, SCREEN_WIDTH - screen_x);
     }
 
     this->window_line++;
@@ -546,8 +597,8 @@ void PPU::ScanOAM()
     {
         const uint8_t* entry = oam_ptr + i * OAM_STRUCT_SIZE;
         const uint8_t obj_y = entry[0];
-
         const int obj_line = this->scanline - (obj_y - 16);
+
         if (obj_line < 0 || obj_line >= object_height)
             continue;
 
@@ -557,7 +608,7 @@ void PPU::ScanOAM()
             break;
     }
 
-    const bool cgb_priority = is_cgb && (*OPRI & OPRI_DMG_MODE_MASK) == 0;
+    const bool cgb_priority = use_cgb_rendering && (*OPRI & OPRI_DMG_MODE_MASK) == 0;
 
     for (int i = 1; i < this->object_count; i++)
     {
@@ -577,24 +628,23 @@ void PPU::ScanOAM()
             this->objects[j + 1] = this->objects[j];
             j--;
         }
-
         this->objects[j + 1] = key;
     }
 }
 
-void PPU::RenderObjects()
+void PPU::RenderObjects(uint16_t* row)
 {
     const uint8_t lcdc = *LCDC;
     if ((lcdc & LCDC_OBJ_ENABLE) == 0)
         return;
 
     const uint8_t object_height = (lcdc & LCDC_OBJ_SIZE) ? 16 : 8;
-    const uint8_t* __restrict__ vram0 = memory->VRAMPtr(false);
-    const uint8_t* __restrict__ vram1 = memory->VRAMPtr(true);
+    const uint8_t* vram0 = memory->VRAMPtr(false);
+    const uint8_t* vram1 = memory->VRAMPtr(true);
     const bool bg_enable = lcdc & LCDC_BG_ENABLE;
 
     uint16_t obp_colors[2][4];
-    if (!is_cgb)
+    if (!use_cgb_rendering)
     {
         const uint8_t obp0 = *OBP0;
         const uint8_t obp1 = *OBP1;
@@ -612,11 +662,10 @@ void PPU::RenderObjects()
         const int object_y = object.y - 16;
 
         const int px_start = object_x < 0 ? -object_x : 0;
-        const int px_end = object_x + TILE_PIXEL_SIZE > SCREEN_WIDTH
+        const int px_end = (object_x + TILE_PIXEL_SIZE > SCREEN_WIDTH)
                                ? SCREEN_WIDTH - object_x
                                : TILE_PIXEL_SIZE;
-        if (px_start >= px_end)
-            continue;
+        if (px_start >= px_end) continue;
 
         const bool flip_y = object.attributes & OBJ_FLIP_Y_MASK;
         const bool flip_x = object.attributes & OBJ_FLIP_X_MASK;
@@ -632,39 +681,45 @@ void PPU::RenderObjects()
             tile_line = tile_line & 7;
         }
 
-        const uint8_t* __restrict__ vsrc =
-            (is_cgb && (object.attributes & OBJ_BANK_MASK)) ? vram1 : vram0;
+        const uint8_t* vsrc =
+            (use_cgb_rendering && (object.attributes & OBJ_BANK_MASK)) ? vram1 : vram0;
 
         const uint8_t td1 = vsrc[tile_index * TILE_SIZE_BYTES + tile_line * 2];
         const uint8_t td2 = vsrc[tile_index * TILE_SIZE_BYTES + tile_line * 2 + 1];
 
-        const uint16_t* __restrict__ colors = is_cgb
-                                                  ? obj_palette_cache[object.attributes & OBJ_CGB_PALETTE_MASK]
-                                                  : obp_colors[(object.attributes & OBJ_DMG_PALETTE_MASK) ? 1 : 0];
+        const uint16_t* colors = use_cgb_rendering
+                                     ? obj_palette_cache[object.attributes & OBJ_CGB_PALETTE_MASK]
+                                     : obp_colors[(object.attributes & OBJ_DMG_PALETTE_MASK) ? 1 : 0];
 
-        int bit = flip_x ? px_start : (7 - px_start);
-        const int bit_step = flip_x ? 1 : -1;
+        const uint16_t* lut = flip_x ? tile_pixel_lut_flipped : tile_pixel_lut;
+        uint16_t td = (lut[td1] | (lut[td2] << 1)) >> (px_start * 2);
 
-        for (int px = px_start; px < px_end; px++, bit += bit_step)
+        if (use_cgb_rendering)
         {
-            const uint8_t color_idx = (((td2 >> bit) & 1) << 1) | ((td1 >> bit) & 1);
-            if (color_idx == 0) continue;
-
-            const int screen_x = object_x + px;
-
-            if (is_cgb)
+            for (int px = px_start; px < px_end; px++, td >>= 2)
             {
-                if (bg_enable && (scanline_bg_priority[screen_x] || has_priority) && scanline_priority[screen_x] != 0)
+                const uint8_t ci = td & 3;
+                if (ci == 0) continue;
+                const int sx = object_x + px;
+                if (bg_enable && (scanline_bg_priority[sx] || has_priority) && scanline_priority[sx] != 0)
                     continue;
+                row[sx] = colors[ci];
+                scanline_priority[sx] = ci;
             }
-            else
+        }
+        else
+        {
+            for (int px = px_start; px < px_end; px++, td >>= 2)
             {
-                if (has_priority && scanline_priority[screen_x] != 0)
-                    continue;
-            }
+                const uint8_t ci = td & 3;
+                if (ci == 0) continue;
 
-            scanline_color[screen_x] = colors[color_idx];
-            scanline_priority[screen_x] = color_idx;
+                const int sx = object_x + px;
+                if (has_priority && scanline_priority[sx] != 0) continue;
+
+                row[sx] = colors[ci];
+                scanline_priority[sx] = ci;
+            }
         }
     }
 }

@@ -1,4 +1,6 @@
 #pragma once
+#include <array>
+
 #include "../memory/memory.h"
 
 #define SCREEN_WIDTH  160
@@ -80,6 +82,7 @@
 #define OAM_STRUCT_SIZE 4
 #define OAM_MAX_COUNT 40
 
+
 enum class PPUMode
 {
     MODE_OAM = 2,
@@ -97,15 +100,23 @@ struct OAMObject
     uint8_t oam_index;
 };
 
+struct BGPEvent
+{
+    uint8_t dot;
+    uint8_t bgp;
+};
+
 class PPU
 {
 public:
-    PPU();
+    PPU(uint16_t* framebuffer, std::array<uint16_t, 4> palette);
     void Cycle(uint8_t cycles);
     void AttachMemory(Memory* mem);
 
     uint16_t* framebuffer = nullptr;
     bool ready_for_draw = false;
+
+    bool use_cgb_rendering = false;
 
 private:
     uint8_t PPURead(uint8_t* io, uint16_t offset);
@@ -116,10 +127,11 @@ private:
 
     void CheckLYC() const;
     void RenderScanline();
-    void RenderBackground();
-    void RenderWindow();
     void ScanOAM();
-    void RenderObjects();
+
+    void RenderBackground(uint16_t* row);
+    void RenderWindow(uint16_t* row);
+    void RenderObjects(uint16_t* row);
 
     void RebuildBGPaletteCache(uint8_t idx);
     void RebuildOBJPaletteCache(uint8_t idx);
@@ -131,9 +143,11 @@ private:
     uint8_t scanline = 0;
     uint8_t window_line = 0;
 
-    uint16_t scanline_color[SCREEN_WIDTH] = {};
     uint8_t scanline_priority[SCREEN_WIDTH] = {};
     uint8_t scanline_bg_priority[SCREEN_WIDTH] = {};
+
+    BGPEvent bgp_events[SCREEN_WIDTH] = {};
+    uint8_t bgp_event_count = 0;
     uint8_t scanline_bgp[SCREEN_WIDTH] = {};
 
     OAMObject objects[OAM_MAX_SPRITES] = {};
@@ -150,14 +164,7 @@ private:
     uint16_t hdma_dst = 0;
     uint16_t hdma_bytes_left = 0;
 
-    uint16_t dmg_palette[4] = {
-        0x6BDE,
-        0x4F58,
-        0x368F,
-        0x1D67
-    };
-
-    bool is_cgb = false;
+    std::array<uint16_t, 4> dmg_palette = {};
 
     uint8_t* LCDC = nullptr;
     uint8_t* STAT = nullptr;

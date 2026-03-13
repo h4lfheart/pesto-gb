@@ -83,7 +83,7 @@ public:
 
     void AttachCPU(CPU* cpu);
     void AttachCartridge(Cartridge* cart);
-    void LoadBootRom(char* boot_rom_path);
+    void LoadBootRom(const std::string& boot_rom_path);
 
     template <class T>
     void RegisterIOHandler(uint8_t start, uint8_t end, T* obj,

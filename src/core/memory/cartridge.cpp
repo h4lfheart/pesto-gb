@@ -10,9 +10,9 @@ Cartridge::Cartridge()
     this->ram = static_cast<uint8_t*>(calloc(1, 128 * 1024));
 }
 
-void Cartridge::LoadRom(char* rom_path)
+void Cartridge::LoadRom(const std::string& rom_path)
 {
-    FILE *rom = fopen(rom_path, "rb");
+    FILE *rom = fopen(rom_path.c_str(), "rb");
 
     fseek(rom, 0, SEEK_END);
     const size_t size = ftell(rom);

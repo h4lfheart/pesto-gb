@@ -2,15 +2,56 @@
 #include <thread>
 #include <filesystem>
 
-#include "emulator/gameboy.h"
+#include "gameboy.h"
 #include "sdl/display.h"
 #include "sdl/audio.h"
 
+#include "argparse/argparse.hpp"
+
 int main(int argc, char** argv)
 {
-    GameBoy game_boy(argv[1], argv[2]);
+    argparse::ArgumentParser arguments("PestoGB");
 
-    std::filesystem::path path(argv[2]);
+    arguments.add_argument("rom")
+        .help("The path for your gameboy or gameboy color rom file.")
+        .required();
+
+    arguments.add_argument("--dmg-bootrom")
+        .help("The path for your gameboy boot rom file.")
+        .default_value("dmg_boot.bin");
+
+    arguments.add_argument("--cgb-bootrom")
+        .help("The path for your gameboy color boot rom file.")
+        .default_value("cgb_boot.bin");
+
+    try {
+        arguments.parse_args(argc, argv);
+    }
+    catch (const std::exception& err) {
+        std::cerr << err.what() << std::endl;
+        std::cerr << arguments;
+
+        printf("Press any key to exit...\n");
+        std::cin.get();
+        return 1;
+    }
+
+    auto rom_path = arguments.get<std::string>("rom");
+
+    GameBoy game_boy(rom_path);
+
+    if (game_boy.IsCGBGame())
+    {
+        auto cgb_boot_path = arguments.get<std::string>("cgb-bootrom");
+        game_boy.LoadBootRom(cgb_boot_path);
+    }
+    else
+    {
+        auto dmg_boot_path = arguments.get<std::string>("dmg-bootrom");
+        game_boy.LoadBootRom(dmg_boot_path);
+    }
+
+    std::filesystem::path path(rom_path);
 
     auto display = Display();
     if (!display.Initialize(path.filename().string())) {

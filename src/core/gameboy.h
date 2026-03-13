@@ -9,17 +9,33 @@
 #include "io/input.h"
 #include "timer/timer.h"
 
+#define GB_COLOR(r, g, b) ((uint16_t)((((b) * 31 / 255) & 0x1F) << 10 | (((g) * 31 / 255) & 0x1F) << 5 | (((r) * 31 / 255) & 0x1F)))
+
 typedef std::function<void(uint16_t data[SCREEN_WIDTH * SCREEN_HEIGHT])> DrawFunction;
 typedef std::function<void(float left, float right)> AudioFunction;
+
+struct GameBoySettings
+{
+    uint16_t* framebuffer = nullptr;
+    std::array<uint16_t, 4> palette = {
+        0x6BDE,
+        0x4F58,
+        0x368F,
+        0x1D67
+    };
+};
 
 class GameBoy
 {
 public:
-    GameBoy(char* boot_rom_path, char* rom_path);
+    GameBoy(const std::string& rom_path, GameBoySettings settings = {});
 
     void Run();
     void Stop();
     bool IsRunning();
+    bool IsCGBGame();
+
+    void LoadBootRom(const std::string& boot_rom_path);
 
     void PressButton(InputButton button);
     void ReleaseButton(InputButton button);

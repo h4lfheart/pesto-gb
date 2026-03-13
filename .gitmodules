@@ -2,3 +2,6 @@
 	path = external/SDL
 	url = https://github.com/libsdl-org/SDL.git
 	branch = SDL2
+[submodule "external/argparse"]
+	path = external/argparse
+	url = https://github.com/p-ranav/argparse

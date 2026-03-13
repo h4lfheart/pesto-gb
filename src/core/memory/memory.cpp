@@ -45,9 +45,9 @@ void Memory::AttachCartridge(Cartridge* cart)
     RebuildPageTable();
 }
 
-void Memory::LoadBootRom(char* boot_rom_path)
+void Memory::LoadBootRom(const std::string& boot_rom_path)
 {
-    FILE* rom = fopen(boot_rom_path, "rb");
+    FILE* rom = fopen(boot_rom_path.c_str(), "rb");
     size_t bytes_read = fread(this->boot_rom, 1, GB_CGB_BOOT_ROM_SIZE, rom);
     fclose(rom);
 
@@ -205,11 +205,29 @@ void Memory::WriteIO(uint16_t offset, uint8_t value)
 
 uint16_t Memory::Read16(uint16_t address)
 {
+    if ((address & 0xFF) != 0xFF) [[likely]]
+    {
+        const MemoryPageEntry& p = page_table[address >> 8];
+        if (p.read != nullptr) [[likely]]
+            return p.read[address & 0xFF] | (p.read[(address & 0xFF) + 1] << 8);
+    }
+
     return Read8(address) | (Read8(address + 1) << 8);
 }
 
 void Memory::Write16(uint16_t address, uint16_t value)
 {
+    if ((address & 0xFF) != 0xFF) [[likely]]
+    {
+        const MemoryPageEntry& p = page_table[address >> 8];
+        if (p.write != nullptr) [[likely]]
+        {
+            p.write[address & 0xFF] = value & 0xFF;
+            p.write[(address & 0xFF) + 1] = value >> 8;
+            return;
+        }
+    }
+
     Write8(address, value & 0xFF);
     Write8(address + 1, value >> 8);
 }

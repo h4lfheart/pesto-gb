@@ -17,17 +17,17 @@ void APU::Cycle(uint8_t cycles)
         return;
     }
 
-    this->frame_counter += cycles;
-    if (this->frame_counter >= APU_FRAME_RATE)
-    {
-        this->frame_counter -= APU_FRAME_RATE;
-        TickFrame();
-    }
-
     this->sample_counter += cycles;
     if (this->sample_counter >= APU_CYCLES_PER_SAMPLE)
     {
         this->sample_counter -= APU_CYCLES_PER_SAMPLE;
+        
+        this->frame_counter += APU_CYCLES_PER_SAMPLE;
+        if (this->frame_counter >= APU_FRAME_RATE)
+        {
+            this->frame_counter -= APU_FRAME_RATE;
+            TickFrame();
+        }
 
         this->channel1->Tick(APU_CYCLES_PER_SAMPLE);
         this->channel2->Tick(APU_CYCLES_PER_SAMPLE);

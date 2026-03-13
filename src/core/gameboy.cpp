@@ -8,21 +8,18 @@ static int64_t now_ns()
     return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-GameBoy::GameBoy(char* boot_rom_path, char* rom_path)
+GameBoy::GameBoy(const std::string& rom_path, GameBoySettings settings)
 {
     this->cpu = new CPU();
     this->memory = new Memory();
     this->cartridge = new Cartridge();
-    this->ppu = new PPU();
+    this->ppu = new PPU(settings.framebuffer, settings.palette);
     this->input = new Input();
     this->timer = new Timer();
     this->apu = new APU();
 
-    if (rom_path != nullptr)
+    if (!rom_path.empty())
         this->cartridge->LoadRom(rom_path);
-
-    if (boot_rom_path != nullptr)
-        this->memory->LoadBootRom(boot_rom_path);
 
     this->memory->AttachCartridge(this->cartridge);
     this->memory->AttachCPU(this->cpu);
@@ -93,6 +90,17 @@ void GameBoy::Stop()
 bool GameBoy::IsRunning()
 {
     return this->is_running;
+}
+
+bool GameBoy::IsCGBGame()
+{
+    return this->cartridge->HasCGBSupport();
+}
+
+void GameBoy::LoadBootRom(const std::string& boot_rom_path)
+{
+    this->memory->LoadBootRom(boot_rom_path);
+    this->ppu->use_cgb_rendering = this->memory->IsCGB();
 }
 
 void GameBoy::PressButton(InputButton button)

@@ -34,7 +34,7 @@ class Cartridge
 public:
     Cartridge();
 
-    void LoadRom(char* rom_path);
+    void LoadRom(const std::string& rom_path);
     void ReadSave(const char* path);
     void WriteSave(const char* path);
 
