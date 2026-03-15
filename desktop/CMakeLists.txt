@@ -24,4 +24,4 @@ set_target_properties(pesto_gb_desktop PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/release"
 )
 target_include_directories(pesto_gb_desktop PRIVATE ${CMAKE_SOURCE_DIR}/../external/argparse/include)
-target_link_libraries(pesto_gb_desktop PRIVATE pesto_core SDL2::SDL2main SDL2::SDL2-static)
+target_link_libraries(pesto_gb_desktop PRIVATE pesto_gb_core SDL2::SDL2main SDL2::SDL2-static)

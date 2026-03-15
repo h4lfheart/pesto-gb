@@ -1,0 +1,6 @@
+# platformio
+.pio
+dependencies.lock
+sdkconfig.esp32-s3-devkitc-1
+managed_components
+data

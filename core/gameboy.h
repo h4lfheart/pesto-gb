@@ -28,11 +28,9 @@ struct GameBoySettings
 class GameBoy
 {
 public:
-    GameBoy(const std::string& rom_path, GameBoySettings settings = {});
+    explicit GameBoy(const std::string& rom_path, GameBoySettings settings = {});
 
-    void Run();
-    void Stop();
-    bool IsRunning();
+    void TickFrame();
     bool IsCGBGame();
 
     void LoadBootRom(const std::string& boot_rom_path);
@@ -46,22 +44,16 @@ public:
     void ReadSave(const char* path);
     void WriteSave(const char* path);
 
-    void SetSpeedup(bool speedup);
-
-    // TODO add wrapper functions for accessing properties in these components
-    PPU* ppu;
-    APU* apu;
-    Cartridge* cartridge;
-
-    DrawFunction OnDrawFunction;
-    AudioFunction OnAudioFunction;
 
 private:
     CPU* cpu;
     Memory* memory;
+    Cartridge* cartridge;
+    PPU* ppu;
+    APU* apu;
     Input* input;
     Timer* timer;
 
-    bool is_running = false;
-    bool is_speedup = false;
+    DrawFunction on_draw_function;
+    AudioFunction on_audio_function;
 };

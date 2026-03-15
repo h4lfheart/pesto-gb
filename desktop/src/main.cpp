@@ -2,11 +2,17 @@
 #include <thread>
 #include <filesystem>
 
-#include "gameboy.h"
+#include "core/gameboy.h"
 #include "sdl/display.h"
 #include "sdl/audio.h"
 
 #include "argparse/argparse.hpp"
+
+
+static int64_t now_ns()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 int main(int argc, char** argv)
 {
@@ -77,16 +83,37 @@ int main(int argc, char** argv)
     std::string save_path = (path.parent_path() / (path.stem().string() + ".sav")).string();
     game_boy.ReadSave(save_path.c_str());
 
+    std::atomic is_running = true;
+    std::atomic is_speedup = false;
+
     std::thread game_thread([&]{
-        game_boy.Run();
+
+        constexpr auto frame_budget = static_cast<int64_t>(1'000'000'000.0 / FRAMES_PER_SECOND);
+        int64_t frame_start = now_ns();
+
+        while (is_running)
+        {
+            if (!is_speedup)
+            {
+                const int64_t next_frame = frame_start + frame_budget;
+                const int64_t sleep_ns = next_frame - now_ns();
+                if (sleep_ns > 0)
+                    std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_ns));
+
+                frame_start = next_frame;
+            }
+
+            game_boy.TickFrame();
+        }
+
     });
 
-    while (game_boy.IsRunning())
+    while (is_running)
     {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                game_boy.Stop();
+                is_running = false;
                 break;
             }
 
@@ -119,7 +146,7 @@ int main(int argc, char** argv)
                     game_boy.PressButton(InputButton::BUTTON_SELECT);
                     break;
                 case SDLK_TAB:
-                    game_boy.SetSpeedup(true);
+                    is_speedup = true;
                     break;
                 }
             }
@@ -153,7 +180,7 @@ int main(int argc, char** argv)
                     game_boy.ReleaseButton(InputButton::BUTTON_SELECT);
                     break;
                 case SDLK_TAB:
-                    game_boy.SetSpeedup(false);
+                    is_speedup = false;
                     break;
                 }
             }

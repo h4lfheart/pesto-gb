@@ -3,11 +3,6 @@
 #include <thread>
 #include <cstdio>
 
-static int64_t now_ns()
-{
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-
 GameBoy::GameBoy(const std::string& rom_path, GameBoySettings settings)
 {
     this->cpu = new CPU();
@@ -29,65 +24,38 @@ GameBoy::GameBoy(const std::string& rom_path, GameBoySettings settings)
     this->input->AttachMemory(this->memory);
     this->timer->AttachMemory(this->memory);
     this->apu->AttachMemory(this->memory);
-
-    this->is_running = true;
 }
 
-// TODO breakout to TickFrame for device-agnostic handling
-void GameBoy::Run()
+
+void GameBoy::TickFrame()
 {
-    const int64_t FRAME_BUDGET_NS = static_cast<int64_t>(1'000'000'000.0 / FRAMES_PER_SECOND);
-    int64_t frame_start = now_ns();
+    int frame_mcycles = static_cast<int>((CLOCK_RATE / T_CYCLES_PER_M_CYCLE) / FRAMES_PER_SECOND);
 
-    while (this->is_running)
+    while (frame_mcycles > 0)
     {
-        if (!this->is_speedup)
-        {
-            const int64_t next_frame = frame_start + FRAME_BUDGET_NS;
-            const int64_t sleep_ns = next_frame - now_ns();
-            if (sleep_ns > 0)
-                std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_ns));
+        const int mcycles = cpu->Cycle();
+        const int tcycles = mcycles * T_CYCLES_PER_M_CYCLE;
 
-            frame_start = next_frame;
+        frame_mcycles -= mcycles;
+
+        ppu->Cycle(tcycles);
+        apu->Cycle(tcycles);
+        timer->Cycle(tcycles);
+
+        if (ppu->ready_for_draw)
+        {
+            on_draw_function(ppu->framebuffer);
+            ppu->ready_for_draw = false;
         }
 
-        int frame_mcycles = static_cast<int>((CLOCK_RATE / T_CYCLES_PER_M_CYCLE) / FRAMES_PER_SECOND);
-        while (frame_mcycles > 0)
+        if (apu->ready_for_samples)
         {
-            const int mcycles = this->cpu->Cycle();
-            const int tcycles = mcycles * T_CYCLES_PER_M_CYCLE;
-
-            frame_mcycles -= mcycles;
-
-            this->ppu->Cycle(tcycles);
-            this->apu->Cycle(tcycles);
-            this->timer->Cycle(tcycles);
-
-            if (this->ppu->ready_for_draw)
-            {
-                this->OnDrawFunction(this->ppu->framebuffer);
-                this->ppu->ready_for_draw = false;
-            }
-
-            if (this->apu->ready_for_samples)
-            {
-                float left, right;
-                this->apu->GetSamples(left, right);
-                this->OnAudioFunction(left, right);
-                this->apu->ready_for_samples = false;
-            }
+            float left, right;
+            apu->GetSamples(left, right);
+            on_audio_function(left, right);
+            apu->ready_for_samples = false;
         }
     }
-}
-
-void GameBoy::Stop()
-{
-    this->is_running = false;
-}
-
-bool GameBoy::IsRunning()
-{
-    return this->is_running;
 }
 
 bool GameBoy::IsCGBGame()
@@ -113,12 +81,12 @@ void GameBoy::ReleaseButton(InputButton button)
 
 void GameBoy::OnDraw(const DrawFunction onDraw)
 {
-    this->OnDrawFunction = onDraw;
+    this->on_draw_function = onDraw;
 }
 
 void GameBoy::OnAudio(const AudioFunction onAudio)
 {
-    this->OnAudioFunction = onAudio;
+    this->on_audio_function = onAudio;
 }
 
 void GameBoy::ReadSave(const char* path)
@@ -129,9 +97,4 @@ void GameBoy::ReadSave(const char* path)
 void GameBoy::WriteSave(const char* path)
 {
     this->cartridge->WriteSave(path);
-}
-
-void GameBoy::SetSpeedup(bool speedup)
-{
-    this->is_speedup = speedup;
 }
